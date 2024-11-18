@@ -8,6 +8,7 @@ from ._locally_linear import LocallyLinearEmbedding, locally_linear_embedding
 from ._mds import MDS, smacof
 from ._spectral_embedding import SpectralEmbedding, spectral_embedding
 from ._t_sne import TSNE, trustworthiness
+from ._t_sne_dimenfix import TSNEDimenfix
 
 __all__ = [
     "locally_linear_embedding",
@@ -18,5 +19,6 @@ __all__ = [
     "SpectralEmbedding",
     "spectral_embedding",
     "TSNE",
+	"TSNEDimenfix",
     "trustworthiness",
 ]

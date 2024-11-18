@@ -102,3 +102,6 @@ myenv/
 
 # output figures
 figures/
+
+# downloaded data
+scikit_learn_data/
