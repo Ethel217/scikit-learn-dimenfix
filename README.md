@@ -10,7 +10,7 @@ pip freeze > requirements.txt
 enable virtual env
 ```cmd
 python -m venv myenv
-myenv/Scripts/activate
+myenv\Scripts\activate
 ```
 
 Change to install path of VS
@@ -18,6 +18,8 @@ Change to install path of VS
 ```cmd
 SET DISTUTILS_USE_SDK=1
 "D:\VS\VC\Auxiliary\Build\vcvarsall.bat" x64
+
+"C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvarsall.bat" x64
 ```
 
 Install dependencies
@@ -30,3 +32,5 @@ Install editable build
 ```cmd
 pip install --editable . --verbose --no-build-isolation --config-settings editable-verbose=true
 ```
+
+**README.rst** is required for installation.
