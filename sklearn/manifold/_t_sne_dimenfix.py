@@ -299,6 +299,24 @@ def _kl_divergence_bh(
 
     return error, grad
 
+def avg_pos(p, range_limits, class_label):
+    p = p.reshape(range_limits[:, 0].shape[0], 2)
+    unique_labels = np.unique(class_label)
+
+    n_labels = len(unique_labels)
+    range_width = 100 / n_labels
+    new_range_limits = np.zeros((p.shape[0], 2))
+
+    avg_y_positions = {
+        cls: np.mean(p[class_label == cls, 0]) for cls in unique_labels
+    }
+
+    new_class_order = sorted(avg_y_positions, key=avg_y_positions.get)
+    for i in range(n_labels):
+        new_range_limits[class_label == new_class_order[i]] = [i * range_width, (i + 1) * range_width]
+    print(new_class_order)
+    return new_range_limits
+
 def accumulate_move_force(p, range_limits, class_label, x_range, out=False):
     p = p.reshape(range_limits[:, 0].shape[0], 2)
 
@@ -365,6 +383,7 @@ def _gradient_descent(
     p0,
     it,
     max_iter,
+    dimenfix,
     range_limits,
     class_ordering,
     class_label,
@@ -380,8 +399,6 @@ def _gradient_descent(
     args=None,
     kwargs=None,
 ):
-    # TODO: embedding changes in this step
-    # print("gradient decent run")
     
     if args is None:
         args = []
@@ -397,6 +414,9 @@ def _gradient_descent(
 
     tic = time()
     for i in range(it, max_iter):
+        if i == 0:
+            p_ = p.copy()
+            plotIntermediate(p_.ravel(), it=i, label=class_label, save=True, name="00")
         check_convergence = (i + 1) % n_iter_check == 0
         # only compute the error when needed
         kwargs["compute_error"] = check_convergence or i == max_iter - 1
@@ -412,40 +432,55 @@ def _gradient_descent(
         update = momentum * update - learning_rate * grad
         p += update
 
+        # if i != 0 and i % 50 == 0:
+        #     p_ = p.copy()
+        #     plotIntermediate(p_.ravel(), it=i, label=class_label, save=True, name="regular")
+
         # TODO: dimenfix
+
+        # if i <= 50:
+        # # if i != 0 and i % 50 == 0:
+        #     p_ = p.copy()
+        #     plotIntermediate(p_.ravel(), it=i, label=class_label, save=True, name="b50")
+
         # clip (fix dimension) and re-order every fix_iter iters
+        # TODO: after 250
         # if i != 0 and i % fix_iter == 0 and range_limits is not None:
+        if i > 250 and i % fix_iter == 0 and range_limits is not None:
             
-        #     # print(range_limits[:, 0].shape[0])
-        #     p = p.reshape(range_limits[:, 0].shape[0], 2)
+            # print(range_limits[:, 0].shape[0])
+            p = p.reshape(range_limits[:, 0].shape[0], 2)
 
-        #     # plot and save
-        #     p_ = p.copy()
-        #     plotIntermediate(p_.ravel(), it=i, label=class_label, save=True, name="init")
+            # plot and save
+            p_ = p.copy()
+            plotIntermediate(p_.ravel(), it=i, label=class_label, save=True, name="init")
 
-        #     # resize as x-axis version
-        #     current_range = np.max(p[:, 0]) - np.min(p[:, 0])
-        #     x_range = (np.max(p[:, 1]) - np.min(p[:, 1]))
-        #     scaling_factor = x_range / current_range if current_range != 0 else 1
+            # resize as x-axis
+            current_range = np.max(p[:, 0]) - np.min(p[:, 0])
+            x_range = (np.max(p[:, 1]) - np.min(p[:, 1]))
+            scaling_factor = x_range / current_range if current_range != 0 else 1
 
-        #     # rescale, also align with center at 0
-        #     p[:, 0] = (p[:, 0] - np.mean(p[:, 0])) * scaling_factor
+            # rescale, also align with center at 0
+            p[:, 0] = (p[:, 0] - np.mean(p[:, 0])) * scaling_factor
 
-        #     # plot rescaled
-        #     p_ = p.copy()
-        #     plotIntermediate(p_.ravel(), it=i, label=class_label, save=True, name="alignx")
+            # plot rescaled
+            p_ = p.copy()
+            plotIntermediate(p_.ravel(), it=i, label=class_label, save=True, name="alignx")
 
-        #     if class_ordering is True:
-        #         range_limits = accumulate_move_force(p, range_limits, class_label, x_range)
-        #         # print(range_limits[0, :])
+            # TODO: reorder by editing range_limits
+            if class_ordering is True:
+                # range_limits = accumulate_move_force(p, range_limits, class_label, x_range)
+                # pass
+                range_limits = avg_pos(p, range_limits, class_label)
             
-        #     p[:, 0] = np.clip(p[:, 0], np.min(p[:, 1]) + (range_limits[:, 0] / 100) * x_range, np.min(p[:, 1]) + (range_limits[:, 1] / 100) * x_range)
+            lower_bound = np.min(p[:, 0])
+            p[:, 0] = np.clip(p[:, 0], lower_bound + (range_limits[:, 0] / 100) * x_range, lower_bound + (range_limits[:, 1] / 100) * x_range)
 
-        #     # plot after iter: ordered (optional) and moved
-        #     p_ = p.copy()
-        #     plotIntermediate(p_.ravel(), it=i, label=class_label, save=True, name="moved")
+            # plot after iter: ordered (optional) and moved
+            p_ = p.copy()
+            plotIntermediate(p_.ravel(), it=i, label=class_label, save=True, name="moved")
 
-        #     p = p.ravel()
+            p = p.ravel()
 
             # consistent with original y-axis size version
             # also not from 0 but from min_y
@@ -456,50 +491,57 @@ def _gradient_descent(
             # accumulate force to move classes
 
         # clip (fix dimension) and re-order !!!every iter!!!
-        if range_limits is not None:
+        # if dimenfix and range_limits is not None:
             
-            # print(range_limits[:, 0].shape[0])
-            p = p.reshape(range_limits[:, 0].shape[0], 2)
+        #     # print(range_limits[:, 0].shape[0])
+        #     p = p.reshape(range_limits[:, 0].shape[0], 2)
 
-            # plot and save every set iters
-            if i != 0 and i % 50 == 0:
-                p_ = p.copy()
-                plotIntermediate(p_.ravel(), it=i, label=class_label, save=True, name="init")
+        #     # plot and save every set iters
+        #     # if i != 0 and i % 50 == 0:
+        #     # if i % 50 == 0:
+        #     if i <= 50:
+        #         p_ = p.copy()
+        #         plotIntermediate(p_.ravel(), it=i, label=class_label, save=True, name="init")
 
-            # resize as x-axis version
-            current_range = np.max(p[:, 0]) - np.min(p[:, 0])
-            x_range = (np.max(p[:, 1]) - np.min(p[:, 1]))
-            scaling_factor = x_range / current_range if current_range != 0 else 1
+        #     # resize as x-axis version
+        #     current_range = np.max(p[:, 0]) - np.min(p[:, 0])
+        #     x_range = (np.max(p[:, 1]) - np.min(p[:, 1]))
+        #     scaling_factor = x_range / current_range if current_range != 0 else 1
 
-            # rescale, also align with center at 0
-            p[:, 0] = (p[:, 0] - np.mean(p[:, 0])) * scaling_factor
+        #     # rescale, also align with center at 0
+        #     p[:, 0] = (p[:, 0] - np.mean(p[:, 0])) * scaling_factor
 
-            # plot rescaled
-            if i != 0 and i % 50 == 0:
-                p_ = p.copy()
-                plotIntermediate(p_.ravel(), it=i, label=class_label, save=True, name="alignx")
+        #     # plot rescaled
+        #     # if i % 50 == 0:
+        #     if i <= 50:
+        #     # if i != 0 and i % 50 == 0:
+        #         p_ = p.copy()
+        #         plotIntermediate(p_.ravel(), it=i, label=class_label, save=True, name="alignx")
 
-            if class_ordering is True:
-                if i % 50 == 0:
-                    print(f"iteration: {i}, force")
-                    range_limits = accumulate_move_force(p, range_limits, class_label, x_range, out=True)
-                else:
-                    range_limits = accumulate_move_force(p, range_limits, class_label, x_range, out=False)
-                # print(range_limits[0, :])
+        #     if class_ordering is True:
+        #         if i % 50 == 0:
+        #             print(f"iteration: {i}, force")
+        #             range_limits = accumulate_move_force(p, range_limits, class_label, x_range, out=True)
+        #         else:
+        #             range_limits = accumulate_move_force(p, range_limits, class_label, x_range, out=False)
+        #         # print(range_limits[0, :])
             
-            # clip move mode
-            if mode == "clip":
-                p[:, 0] = np.clip(p[:, 0], np.min(p[:, 1]) + (range_limits[:, 0] / 100) * x_range, np.min(p[:, 1]) + (range_limits[:, 1] / 100) * x_range)
-            elif mode == "uniform": # set +-5 as range
-                p[:, 0] = np.clip(p[:, 0], np.min(p[:, 1]) + ((range_limits[:, 0] - 5) / 100) * x_range, np.min(p[:, 1]) + ((range_limits[:, 1] + 5) / 100) * x_range)
-                range_limits = np.column_stack((p[:, 0], p[:, 0]))
+        #     # clip move mode
+        #     lower_bound = np.min(p[:, 0])
+        #     if mode == "clip":
+        #         p[:, 0] = np.clip(p[:, 0], lower_bound + (range_limits[:, 0] / 100) * x_range, lower_bound + (range_limits[:, 1] / 100) * x_range)
+        #     elif mode == "uniform": # set +-5 as range
+        #         p[:, 0] = np.clip(p[:, 0], lower_bound + ((range_limits[:, 0] - 5) / 100) * x_range, lower_bound + ((range_limits[:, 1] + 5) / 100) * x_range)
+        #         # range_limits = np.column_stack((p[:, 0], p[:, 0]))
                 
-            # plot after iter: ordered (optional) and moved
-            if i != 0 and i % 50 == 0:
-                p_ = p.copy()
-                plotIntermediate(p_.ravel(), it=i, label=class_label, save=True, name="moved")
+        #     # plot after iter: ordered (optional) and moved
+        #     # if i % 50 == 0:
+        #     if i <= 50:
+        #     # if i != 0 and i % 50 == 0:
+        #         p_ = p.copy()
+        #         plotIntermediate(p_.ravel(), it=i, label=class_label, save=True, name="moved")
 
-            p = p.ravel()
+        #     p = p.ravel()
 
         if check_convergence:
             toc = time()
@@ -683,7 +725,7 @@ class TSNEDimenfix(ClassNamePrefixFeaturesOutMixin, TransformerMixin, BaseEstima
         "metric": [StrOptions(set(_VALID_METRICS) | {"precomputed"}), callable],
         "metric_params": [dict, None],
         "init": [
-            StrOptions({"pca", "random"}),
+            StrOptions({"pca", "random", "band"}),
             np.ndarray,
         ],
         "verbose": ["verbose"],
@@ -722,6 +764,7 @@ class TSNEDimenfix(ClassNamePrefixFeaturesOutMixin, TransformerMixin, BaseEstima
         angle=0.5,
         n_jobs=None,
         n_iter="deprecated",
+        dimenfix=False,
         range_limits=None,
         class_ordering=False,
         class_label=None,
@@ -744,6 +787,7 @@ class TSNEDimenfix(ClassNamePrefixFeaturesOutMixin, TransformerMixin, BaseEstima
         self.angle = angle
         self.n_jobs = n_jobs
         self.n_iter = n_iter
+        self.dimenfix = dimenfix
         self.range_limits = range_limits
         self.class_ordering = class_ordering
         self.class_label = class_label
@@ -929,6 +973,18 @@ class TSNEDimenfix(ClassNamePrefixFeaturesOutMixin, TransformerMixin, BaseEstima
             X_embedded = 1e-4 * random_state.standard_normal(
                 size=(n_samples, self.n_components)
             ).astype(np.float32)
+        elif self.init == "band":
+            # Uniform random init in bands defined in range_limits
+            x_coords = random_state.uniform(low=0.0, high=1.0, size=n_samples) #[1]
+            y_coords = np.array([
+                random_state.uniform(low=y_min, high=y_max) 
+                for y_min, y_max in self.range_limits
+            ])
+            # normalized y_coords to size 1 as x
+            y_min_global, y_max_global = np.min(y_coords), np.max(y_coords)
+            y_coords = (y_coords - y_min_global) / (y_max_global - y_min_global)
+            X_embedded = np.column_stack((y_coords, x_coords)).astype(np.float32)
+            # X_embedded *= 1e-4  # Optional: Scale down to align with random init
 
         # Degrees of freedom of the Student's t-distribution. The suggestion
         # degrees_of_freedom = n_components - 1 comes from
@@ -973,6 +1029,7 @@ class TSNEDimenfix(ClassNamePrefixFeaturesOutMixin, TransformerMixin, BaseEstima
             "n_iter_without_progress": self._EXPLORATION_MAX_ITER,
             "max_iter": self._EXPLORATION_MAX_ITER,
             "momentum": 0.5,
+            "dimenfix": self.dimenfix,
             "range_limits": self.range_limits,
             "class_ordering": self.class_ordering,
             "class_label": self.class_label,
