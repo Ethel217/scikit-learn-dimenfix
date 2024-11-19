@@ -13,7 +13,7 @@ from sklearn.manifold import trustworthiness
 
 def main():
     # input dataset
-    mnist = fetch_openml('mnist_784', version=1, data_home="..\\scikit_learn_data")
+    mnist = fetch_openml('mnist_784', version=1, data_home=".\\scikit_learn_data")
     # return
     X = mnist.data.to_numpy()
     sample_indices = np.random.choice(X.shape[0], size=1000, replace=False)
