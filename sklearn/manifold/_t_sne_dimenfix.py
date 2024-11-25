@@ -379,6 +379,33 @@ def accumulate_move_force(p, range_limits, class_label, x_range, out=False):
     # print(range_limits_new[0, :])
     return range_limits
 
+def sim_class_P(P, class_label):
+    P = squareform(P) * 1000
+    # np.set_printoptions(precision=1)
+    # print(P)
+    # print(class_label)
+    num_classes = len(np.unique(class_label))
+
+    class_sim = np.zeros((num_classes, num_classes))
+    for i in range(num_classes):
+        for j in range(i + 1, num_classes):
+            i_index = np.where(class_label == i)[0]
+            j_index = np.where(class_label == j)[0]
+
+            cnt = 0
+            sim = 0
+            for idx_i in i_index:
+                for idx_j in j_index:
+                    sim += P[idx_i][idx_j]
+                    cnt += 1
+                    
+            class_sim[i][j] = sim / cnt
+            class_sim[j][i] = sim / cnt
+
+    np.set_printoptions(precision=1)
+    print(class_sim)
+
+
 def _gradient_descent(
     objective,
     p0,
@@ -480,7 +507,7 @@ def _gradient_descent(
                     sigma = np.full_like(range_limits[:, 0], x_range / (10 * z)) # for fixed value
                 else:
                     sigma = (range_limits[:, 1] - range_limits[:, 0]) * x_range / (40 * z)
-                print(sigma[0])
+                # print(sigma[0])
 
                 ori_pos = lower_bound + (range_limits[:, 0] + range_limits[:, 1]) * x_range / 200
                 diff = p[:, 0] - ori_pos
@@ -1008,6 +1035,9 @@ class TSNEDimenfix(ClassNamePrefixFeaturesOutMixin, TransformerMixin, BaseEstima
         # * initial optimization with early exaggeration and momentum at 0.5
         # * final optimization with momentum at 0.8
         params = X_embedded.ravel()
+
+        P_ = P.copy()
+        sim_class_P(P_, self.class_label)
 
         opt_args = {
             "it": 0,
