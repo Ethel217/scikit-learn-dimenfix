@@ -23,17 +23,33 @@ def main():
     print("Number of points:", n_points)
 
     # create movable range limits for each point: as percentage!!
-    unique_labels = np.unique(label)
+    unique_labels, counts = np.unique(label, return_counts=True)
     n_labels = len(unique_labels)
     print(f'Number of different labels: {n_labels}')
+    print(f'Counts per label: {counts}')
+
+    # equally band ver
     range_width = 100 / n_labels
     range_limits = np.zeros((X.shape[0], 2))
     for l in unique_labels:
         range_limits[label == l] = [l * range_width, (l + 1) * range_width]
     print(range_limits.shape)
 
+    # band scale with class density ver
+    # total_count = counts.sum()
+    # proportions = counts / total_count
+
+    # cumulative_ranges = np.cumsum(proportions) * 100
+    # range_limits = np.zeros((X.shape[0], 2))
+
+    # start = 0
+    # for i, l in enumerate(unique_labels):
+    #     end = cumulative_ranges[i]
+    #     range_limits[label == l] = [start, end]
+    #     start = end
+
     start = timer()
-    y = TSNEDimenfix(n_components=2, learning_rate='auto', init='random', perplexity=10, dimenfix=True, range_limits=range_limits, class_ordering=True, class_label=label, fix_iter=50).fit_transform(X)
+    y = TSNEDimenfix(n_components=2, learning_rate='auto', init='random', perplexity=10, dimenfix=True, range_limits=range_limits, class_ordering=True, class_label=label, fix_iter=50, mode="gaussian").fit_transform(X)
     end = timer()
     # print(f"{trustworthiness(X, y, n_neighbors=20):.3f}")
 

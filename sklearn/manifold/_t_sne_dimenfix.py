@@ -16,6 +16,8 @@ from scipy import linalg
 from scipy.sparse import csr_matrix, issparse
 from scipy.spatial.distance import pdist, squareform
 
+from scipy.stats import norm
+
 from ..base import (
     BaseEstimator,
     ClassNamePrefixFeaturesOutMixin,
@@ -446,12 +448,11 @@ def _gradient_descent(
         # clip (fix dimension) and re-order every fix_iter iters
         # TODO: after 250
         # if i != 0 and i % fix_iter == 0 and range_limits is not None:
-        if i > 250 and i % fix_iter == 0 and range_limits is not None:
+        if dimenfix and i % fix_iter == 0 and range_limits is not None:
             
             # print(range_limits[:, 0].shape[0])
             p = p.reshape(range_limits[:, 0].shape[0], 2)
 
-            # plot and save
             p_ = p.copy()
             plotIntermediate(p_.ravel(), it=i, label=class_label, save=True, name="init")
 
@@ -474,7 +475,21 @@ def _gradient_descent(
                 range_limits = avg_pos(p, range_limits, class_label)
             
             lower_bound = np.min(p[:, 0])
-            p[:, 0] = np.clip(p[:, 0], lower_bound + (range_limits[:, 0] / 100) * x_range, lower_bound + (range_limits[:, 1] / 100) * x_range)
+            if mode == "clip":
+                p[:, 0] = np.clip(p[:, 0], lower_bound + (range_limits[:, 0] / 100) * x_range, lower_bound + (range_limits[:, 1] / 100) * x_range)
+            elif mode == "gaussian": # default CI = 0.9
+                clipped = np.clip(p[:, 0], lower_bound + (range_limits[:, 0] / 100) * x_range, lower_bound + (range_limits[:, 1] / 100) * x_range)
+                diff = p[:, 0] - clipped
+                # apply gaussian on diff
+                CI = 0.7
+                z = norm.ppf(1 - (1 - CI) / 2)
+                sigma = (range_limits[:, 1] - range_limits[:, 0]) * x_range / (200 * z)
+
+                # ori_pos = lower_bound + (range_limits[:, 0] + range_limits[:, 1]) * x_range / 200
+                ds = diff * np.exp(-(diff ** 2) / (2 * sigma ** 2))
+                p[:, 0] = clipped + ds
+                # p[:, 0] = ori_pos
+                # print(sigma[0])
 
             # plot after iter: ordered (optional) and moved
             p_ = p.copy()
@@ -499,7 +514,7 @@ def _gradient_descent(
         #     # plot and save every set iters
         #     # if i != 0 and i % 50 == 0:
         #     # if i % 50 == 0:
-        #     if i <= 50:
+        #     if i <= 50 or i % 20 == 0:
         #         p_ = p.copy()
         #         plotIntermediate(p_.ravel(), it=i, label=class_label, save=True, name="init")
 
@@ -513,7 +528,7 @@ def _gradient_descent(
 
         #     # plot rescaled
         #     # if i % 50 == 0:
-        #     if i <= 50:
+        #     if i <= 50 or i % 20 == 0:
         #     # if i != 0 and i % 50 == 0:
         #         p_ = p.copy()
         #         plotIntermediate(p_.ravel(), it=i, label=class_label, save=True, name="alignx")
@@ -536,7 +551,7 @@ def _gradient_descent(
                 
         #     # plot after iter: ordered (optional) and moved
         #     # if i % 50 == 0:
-        #     if i <= 50:
+        #     if i <= 50 or i % 20 == 0:
         #     # if i != 0 and i % 50 == 0:
         #         p_ = p.copy()
         #         plotIntermediate(p_.ravel(), it=i, label=class_label, save=True, name="moved")
@@ -699,9 +714,11 @@ def plotIntermediate(p, it, label=None, show=False, save=False, name="default"):
     plt.figure(figsize=(8, 6))
     if label is not None:
         plt.scatter(p_reshaped[:, 1], p_reshaped[:, 0], c=label.astype(int), cmap='tab10', edgecolor='face', s=12)
+        plt.ylim(np.min(p_reshaped[:, 0]), np.max(p_reshaped[:, 0]))
         plt.colorbar()
     else:
         plt.scatter(p_reshaped[:, 1], p_reshaped[:, 0], edgecolor='face', s=12)
+        plt.ylim(p_reshaped[:, 0].min(), p_reshaped[:, 0].max())
     plt.title(f"Intermediate iteration: {it}")
     if save:
         plt.savefig(f'.\\figures\\iter_{it}_{name}.png', dpi=300, bbox_inches='tight')
@@ -1034,6 +1051,7 @@ class TSNEDimenfix(ClassNamePrefixFeaturesOutMixin, TransformerMixin, BaseEstima
             "class_ordering": self.class_ordering,
             "class_label": self.class_label,
             "fix_iter": self.fix_iter,
+            "mode": self.mode,
         }
         if self.method == "barnes_hut":
             obj_func = _kl_divergence_bh
