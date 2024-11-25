@@ -71,7 +71,6 @@ def _joint_probabilities(distances, desired_perplexity, verbose):
     P = np.maximum(squareform(P) / sum_P, MACHINE_EPSILON)
     return P
 
-
 def _joint_probabilities_nn(distances, desired_perplexity, verbose):
     """Compute joint probabilities p_ij from distances using just nearest
     neighbors.
@@ -127,7 +126,6 @@ def _joint_probabilities_nn(distances, desired_perplexity, verbose):
         duration = time() - t0
         print("[t-SNE] Computed conditional probabilities in {:.3f}s".format(duration))
     return P
-
 
 def _kl_divergence(
     params,
@@ -204,7 +202,6 @@ def _kl_divergence(
     grad *= c
 
     return kl_divergence, grad
-
 
 def _kl_divergence_bh(
     params,
@@ -301,6 +298,8 @@ def _kl_divergence_bh(
 
     return error, grad
 
+# class ordering functions
+
 def avg_pos(p, range_limits, class_label):
     p = p.reshape(range_limits[:, 0].shape[0], 2)
     unique_labels = np.unique(class_label)
@@ -385,12 +384,14 @@ def _gradient_descent(
     p0,
     it,
     max_iter,
+    # dimenfix related params
     dimenfix,
     range_limits,
     class_ordering,
     class_label,
     fix_iter, # apply fix (and order classes) every N iters
     mode="clip",
+    start_iter=0,
     n_iter_check=1,
     n_iter_without_progress=300,
     momentum=0.8,
@@ -414,11 +415,19 @@ def _gradient_descent(
     best_error = np.finfo(float).max
     best_iter = i = it
 
+    if max_iter / fix_iter < 50:
+        print_iter = fix_iter
+    else:
+        print_iter = 50  # default print intermediate iters: 50
+
     tic = time()
     for i in range(it, max_iter):
+
+        # plot init
         if i == 0:
             p_ = p.copy()
             plotIntermediate(p_.ravel(), it=i, label=class_label, save=True, name="00")
+
         check_convergence = (i + 1) % n_iter_check == 0
         # only compute the error when needed
         kwargs["compute_error"] = check_convergence or i == max_iter - 1
@@ -432,131 +441,92 @@ def _gradient_descent(
         np.clip(gains, min_gain, np.inf, out=gains)
         grad *= gains
         update = momentum * update - learning_rate * grad
+        last_p = p.copy()
+        last_p = last_p.reshape(-1, 2)
         p += update
 
-        # if i != 0 and i % 50 == 0:
-        #     p_ = p.copy()
-        #     plotIntermediate(p_.ravel(), it=i, label=class_label, save=True, name="regular")
+        # plot init
+        if i > 0 and i % print_iter == 0:
+            p_ = p.copy()
+            plotIntermediate(p_, it=i, label=class_label, save=True, name="init")
 
-        # TODO: dimenfix
-
-        # if i <= 50:
-        # # if i != 0 and i % 50 == 0:
-        #     p_ = p.copy()
-        #     plotIntermediate(p_.ravel(), it=i, label=class_label, save=True, name="b50")
-
-        # clip (fix dimension) and re-order every fix_iter iters
-        # TODO: after 250
-        # if i != 0 and i % fix_iter == 0 and range_limits is not None:
-        if dimenfix and i % fix_iter == 0 and range_limits is not None:
+        if dimenfix and i >= start_iter and i % fix_iter == 0 and range_limits is not None:
             
-            # print(range_limits[:, 0].shape[0])
             p = p.reshape(range_limits[:, 0].shape[0], 2)
 
-            p_ = p.copy()
-            plotIntermediate(p_.ravel(), it=i, label=class_label, save=True, name="init")
-
-            # resize as x-axis
+            # resize y-axis as x-axis
             current_range = np.max(p[:, 0]) - np.min(p[:, 0])
             x_range = (np.max(p[:, 1]) - np.min(p[:, 1]))
             scaling_factor = x_range / current_range if current_range != 0 else 1
-
             # rescale, also align with center at 0
-            p[:, 0] = (p[:, 0] - np.mean(p[:, 0])) * scaling_factor
-
-            # plot rescaled
-            p_ = p.copy()
-            plotIntermediate(p_.ravel(), it=i, label=class_label, save=True, name="alignx")
+            p[:, 0] = (p[:, 0] - (np.max(p[:, 0]) + np.min(p[:, 0])) / 2) * scaling_factor
 
             # TODO: reorder by editing range_limits
             if class_ordering is True:
                 # range_limits = accumulate_move_force(p, range_limits, class_label, x_range)
                 # pass
                 range_limits = avg_pos(p, range_limits, class_label)
-            
+
+            # push into bins
             lower_bound = np.min(p[:, 0])
+
             if mode == "clip":
                 p[:, 0] = np.clip(p[:, 0], lower_bound + (range_limits[:, 0] / 100) * x_range, lower_bound + (range_limits[:, 1] / 100) * x_range)
+            
             elif mode == "gaussian": # default CI = 0.9
-                clipped = np.clip(p[:, 0], lower_bound + (range_limits[:, 0] / 100) * x_range, lower_bound + (range_limits[:, 1] / 100) * x_range)
-                diff = p[:, 0] - clipped
-                # apply gaussian on diff
-                CI = 0.7
+                CI = 0.9
                 z = norm.ppf(1 - (1 - CI) / 2)
-                sigma = (range_limits[:, 1] - range_limits[:, 0]) * x_range / (200 * z)
+                if np.abs(range_limits[:, 1] - range_limits[:, 0]).all() <= 1e-6:
+                    sigma = np.full_like(range_limits[:, 0], x_range / (10 * z)) # for fixed value
+                else:
+                    sigma = (range_limits[:, 1] - range_limits[:, 0]) * x_range / (40 * z)
+                print(sigma[0])
+
+                ori_pos = lower_bound + (range_limits[:, 0] + range_limits[:, 1]) * x_range / 200
+                diff = p[:, 0] - ori_pos
+
+                # clipped = np.clip(p[:, 0], lower_bound + (range_limits[:, 0] / 100) * x_range, lower_bound + (range_limits[:, 1] / 100) * x_range)
+                # diff = p[:, 0] - clipped
+                # apply gaussian on diff
+                
+                
 
                 # ori_pos = lower_bound + (range_limits[:, 0] + range_limits[:, 1]) * x_range / 200
-                ds = diff * np.exp(-(diff ** 2) / (2 * sigma ** 2))
-                p[:, 0] = clipped + ds
-                # p[:, 0] = ori_pos
-                # print(sigma[0])
+                # update_ = update.copy()
+                # update_ = update_.reshape(-1, 2)
+                # upd = update_[:, 0] * np.exp(-((last_p[:, 0] - ori_pos) ** 2) / (2 * sigma ** 2))
+                # p[:, 1] = last_p[:, 1] + update_[:, 1]
+                # p[:, 0] = last_p[:, 0] + upd
 
-            # plot after iter: ordered (optional) and moved
-            p_ = p.copy()
-            plotIntermediate(p_.ravel(), it=i, label=class_label, save=True, name="moved")
+                # # ori_pos = lower_bound + (range_limits[:, 0] + range_limits[:, 1]) * x_range / 200
+                ds = diff * np.exp(-(diff ** 2) / (2 * sigma ** 2))
+                p[:, 0] = ori_pos + ds
+                
+            elif mode == "rescale":
+                coverage = 95 # default
+                unique_lables = np.unique(class_label)
+                for label in unique_lables:
+                    y_values = p[class_label == label, 0]
+                    lower_c = np.percentile(y_values, (100 - coverage) / 2)
+                    upper_c = np.percentile(y_values, 100 - (100 - coverage) / 2)
+                    y_range = upper_c - lower_c
+
+                    label_indices = np.where(class_label == label)[0]
+                    lower = range_limits[label_indices[0], 0] * x_range / 100
+                    upper = range_limits[label_indices[0], 1] * x_range / 100
+                    set_range = upper - lower
+
+                    p[class_label == label, 0] *= set_range / y_range
+                    center_pos = (upper_c + lower_c) * (set_range / y_range)  / 2
+                    p[class_label == label, 0] = p[class_label == label, 0] - center_pos + (upper + lower) / 2
 
             p = p.ravel()
 
-            # consistent with original y-axis size version
-            # also not from 0 but from min_y
-            # y_range = (np.max(p[:, 0]) - np.min(p[:, 0]))
-            # p[:, 0] = np.clip(p[:, 0], np.min(p[:, 0]) + (range_limits[:, 0] / 100) * y_range, np.min(p[:, 0]) + (range_limits[:, 1] / 100) * y_range)
-            # p = p.ravel()
+        # plot after
+        if i >= start_iter and i % print_iter == 0:
+            p_ = p.copy()
+            plotIntermediate(p_, it=i, label=class_label, save=True, name="moved")
 
-            # accumulate force to move classes
-
-        # clip (fix dimension) and re-order !!!every iter!!!
-        # if dimenfix and range_limits is not None:
-            
-        #     # print(range_limits[:, 0].shape[0])
-        #     p = p.reshape(range_limits[:, 0].shape[0], 2)
-
-        #     # plot and save every set iters
-        #     # if i != 0 and i % 50 == 0:
-        #     # if i % 50 == 0:
-        #     if i <= 50 or i % 20 == 0:
-        #         p_ = p.copy()
-        #         plotIntermediate(p_.ravel(), it=i, label=class_label, save=True, name="init")
-
-        #     # resize as x-axis version
-        #     current_range = np.max(p[:, 0]) - np.min(p[:, 0])
-        #     x_range = (np.max(p[:, 1]) - np.min(p[:, 1]))
-        #     scaling_factor = x_range / current_range if current_range != 0 else 1
-
-        #     # rescale, also align with center at 0
-        #     p[:, 0] = (p[:, 0] - np.mean(p[:, 0])) * scaling_factor
-
-        #     # plot rescaled
-        #     # if i % 50 == 0:
-        #     if i <= 50 or i % 20 == 0:
-        #     # if i != 0 and i % 50 == 0:
-        #         p_ = p.copy()
-        #         plotIntermediate(p_.ravel(), it=i, label=class_label, save=True, name="alignx")
-
-        #     if class_ordering is True:
-        #         if i % 50 == 0:
-        #             print(f"iteration: {i}, force")
-        #             range_limits = accumulate_move_force(p, range_limits, class_label, x_range, out=True)
-        #         else:
-        #             range_limits = accumulate_move_force(p, range_limits, class_label, x_range, out=False)
-        #         # print(range_limits[0, :])
-            
-        #     # clip move mode
-        #     lower_bound = np.min(p[:, 0])
-        #     if mode == "clip":
-        #         p[:, 0] = np.clip(p[:, 0], lower_bound + (range_limits[:, 0] / 100) * x_range, lower_bound + (range_limits[:, 1] / 100) * x_range)
-        #     elif mode == "uniform": # set +-5 as range
-        #         p[:, 0] = np.clip(p[:, 0], lower_bound + ((range_limits[:, 0] - 5) / 100) * x_range, lower_bound + ((range_limits[:, 1] + 5) / 100) * x_range)
-        #         # range_limits = np.column_stack((p[:, 0], p[:, 0]))
-                
-        #     # plot after iter: ordered (optional) and moved
-        #     # if i % 50 == 0:
-        #     if i <= 50 or i % 20 == 0:
-        #     # if i != 0 and i % 50 == 0:
-        #         p_ = p.copy()
-        #         plotIntermediate(p_.ravel(), it=i, label=class_label, save=True, name="moved")
-
-        #     p = p.ravel()
 
         if check_convergence:
             toc = time()
@@ -713,11 +683,11 @@ def plotIntermediate(p, it, label=None, show=False, save=False, name="default"):
     
     plt.figure(figsize=(8, 6))
     if label is not None:
-        plt.scatter(p_reshaped[:, 1], p_reshaped[:, 0], c=label.astype(int), cmap='tab10', edgecolor='face', s=12)
+        plt.scatter(p_reshaped[:, 1], p_reshaped[:, 0], c=label.astype(int), cmap='tab10', edgecolor='face', s=10)
         plt.ylim(np.min(p_reshaped[:, 0]), np.max(p_reshaped[:, 0]))
         plt.colorbar()
     else:
-        plt.scatter(p_reshaped[:, 1], p_reshaped[:, 0], edgecolor='face', s=12)
+        plt.scatter(p_reshaped[:, 1], p_reshaped[:, 0], edgecolor='face', s=10)
         plt.ylim(p_reshaped[:, 0].min(), p_reshaped[:, 0].max())
     plt.title(f"Intermediate iteration: {it}")
     if save:
@@ -781,12 +751,14 @@ class TSNEDimenfix(ClassNamePrefixFeaturesOutMixin, TransformerMixin, BaseEstima
         angle=0.5,
         n_jobs=None,
         n_iter="deprecated",
+        # dimenfix related params
         dimenfix=False,
         range_limits=None,
         class_ordering=False,
         class_label=None,
         fix_iter=30,
         mode="clip",
+        early_push=False,
     ):
         self.n_components = n_components
         self.perplexity = perplexity
@@ -804,12 +776,14 @@ class TSNEDimenfix(ClassNamePrefixFeaturesOutMixin, TransformerMixin, BaseEstima
         self.angle = angle
         self.n_jobs = n_jobs
         self.n_iter = n_iter
+        # dimenfix related params
         self.dimenfix = dimenfix
         self.range_limits = range_limits
         self.class_ordering = class_ordering
         self.class_label = class_label
         self.fix_iter = fix_iter
         self.mode = mode
+        self.early_push = early_push
 
     def _check_params_vs_input(self, X):
         if self.perplexity >= X.shape[0]:
@@ -1053,6 +1027,10 @@ class TSNEDimenfix(ClassNamePrefixFeaturesOutMixin, TransformerMixin, BaseEstima
             "fix_iter": self.fix_iter,
             "mode": self.mode,
         }
+        if self.early_push:
+            opt_args["start_iter"] = 0
+        else:
+            opt_args["start_iter"] = self._EXPLORATION_MAX_ITER
         if self.method == "barnes_hut":
             obj_func = _kl_divergence_bh
             opt_args["kwargs"]["angle"] = self.angle

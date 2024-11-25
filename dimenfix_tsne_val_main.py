@@ -33,7 +33,8 @@ def main():
     print(range_limits.shape)
 
     start = timer()
-    y = TSNEDimenfix(n_components=2, learning_rate='auto', init='random', perplexity=10, early_exaggeration=4, max_iter=500, range_limits=range_limits, dimenfix=True, class_ordering=False, class_label=label, fix_iter=30, mode="clip").fit_transform(X)
+    y = TSNEDimenfix(n_components=2, learning_rate='auto', init='random', perplexity=10, early_exaggeration=4, max_iter=500, \
+                     range_limits=range_limits, dimenfix=True, class_ordering=False, class_label=label, fix_iter=30, mode="gaussian", early_push=True).fit_transform(X)
     end = timer()
     # print(f"{trustworthiness(X, y, n_neighbors=20):.3f}")
 
@@ -48,42 +49,6 @@ def main():
     plt.savefig('.\\figures\\iris_fix_val.png', dpi=300, bbox_inches='tight')
     plt.show()
     # plt.clf()
-    
-    # start = timer()
-    # y = TSNEDimenfix(n_components=2, learning_rate='auto', init='random', perplexity=10, range_limits=range_limits).fit_transform(X)
-    # # y = DimenFixForceScheme(max_it=1000, fixed_feature=fixed_feature, alpha=0.8).fit_transform(X)
-    # end = timer()
-    # print(f"{trustworthiness(X, y, n_neighbors=20):.3f}")
-
-    # print(np.amin(y, axis=0))
-
-    # print('Dimenfix TSNE took {0} to execute'.format(timedelta(seconds=end - start)))
-
-    # plt.figure()
-    # plt.scatter(y[:, 1], y[:, 0], c=label, cmap='tab10', edgecolors='face', linewidths=0.5, s=12)
-    # plt.colorbar()
-    # plt.grid(linestyle='dotted')
-    # plt.savefig('.\\figures\\mnist_600_fix.png', dpi=300, bbox_inches='tight')
-    # plt.show()
-    # plt.clf()
-    
-    # start = timer()
-    # y = TSNEDimenfix(n_components=2, learning_rate='auto', init='random', perplexity=10, range_limits=None).fit_transform(X)
-    # end = timer()
-
-    # print(f"{trustworthiness(X, y, n_neighbors=20):.3f}")
-
-    # print(np.amin(y, axis=0))
-
-    # print('Regular TSNE took {0} to execute'.format(timedelta(seconds=end - start)))
-
-    # plt.figure()
-    # plt.scatter(y[:, 1], y[:, 0], c=label, cmap='tab10', edgecolors='face', linewidths=0.5, s=12)
-    # plt.grid(linestyle='dotted')
-    # plt.colorbar()
-    # plt.savefig('.\\figures\\mnist_600_base.png', dpi=300, bbox_inches='tight')
-    # plt.show()
-
     return
 
 

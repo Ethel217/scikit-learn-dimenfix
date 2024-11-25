@@ -34,3 +34,9 @@ pip install --editable . --verbose --no-build-isolation --config-settings editab
 ```
 
 **README.rst** is required for installation.
+
+Call dimenfix t-SNE function, example:
+
+```python
+y = TSNEDimenfix(n_components=2, learning_rate='auto', init='random', perplexity=10, dimenfix=True, range_limits=range_limits, class_ordering=True, class_label=label, fix_iter=50, mode="gaussian").fit_transform(X)
+```

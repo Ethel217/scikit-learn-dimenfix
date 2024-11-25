@@ -12,12 +12,13 @@ from sklearn.manifold import trustworthiness
 def main():
     # input dataset
     mnist = fetch_openml('mnist_784', version=1, data_home=".\\scikit_learn_data")
-    # return
     X = mnist.data.to_numpy()
-    sample_indices = np.random.choice(X.shape[0], size=1000, replace=False)
+    sample_indices = np.random.choice(X.shape[0], size=2000, replace=False)
     X = X[sample_indices]
+
     label = mnist.target.to_numpy()
     label = label[sample_indices].astype(int)
+
     X = preprocessing.MinMaxScaler().fit_transform(X)
     n_points = X.shape[0]
     print("Number of points:", n_points)
@@ -49,7 +50,8 @@ def main():
     #     start = end
 
     start = timer()
-    y = TSNEDimenfix(n_components=2, learning_rate='auto', init='random', perplexity=10, dimenfix=True, range_limits=range_limits, class_ordering=True, class_label=label, fix_iter=50, mode="gaussian").fit_transform(X)
+    y = TSNEDimenfix(n_components=2, learning_rate='auto', init='random', perplexity=10, \
+                      dimenfix=True, range_limits=range_limits, class_ordering=False, class_label=label, fix_iter=5, mode="gaussian", early_push=False).fit_transform(X)
     end = timer()
     # print(f"{trustworthiness(X, y, n_neighbors=20):.3f}")
 
