@@ -73,35 +73,31 @@ def main():
     plt.show()
     # plt.clf()
 
-    
+    # y = y.tolist()
+    embedding = [{"x": float(x_), "y": float(y_)} for x_, y_ in y]
+    with open('embedding.json', 'w') as f:
+        json.dump(embedding, f, indent=2)
 
-    with open('ratios.json', 'r') as f:
-        class_attr = np.array(json.load(f))
+    # with open('ratios.json', 'r') as f:
+    #     class_attr = np.array(json.load(f))
 
-    ratios = class_attr / class_attr.sum(axis=1, keepdims=True)
+    # ratios = class_attr / class_attr.sum(axis=1, keepdims=True)
 
-    df = pd.DataFrame(y, columns=['y', 'x'])
-    df['label'] = label
-    df['ratios'] = [list(r) for r in ratios]
+    # df = pd.DataFrame(y, columns=['y', 'x'])
+    # df['label'] = label
+    # df['ratios'] = [list(r) for r in ratios]
 
-    fig = px.scatter(
-        df,
-        x = 'x',
-        y = 'y',
-        color = 'label',
-        # size = 5,
-        hover_data = ['ratios'],
-        title = ' xx '
-    )
-    
-    # fig.update_traces(
-    #     hoverinfo='text+label+vakue',
-    #     customdata=ratios,
-    #     textinfo='label+value+percent',
-    #     hovertemplate="<b>Sample index: %{customdata}</b><br>%{text}<extra></extra>"
+    # fig = px.scatter(
+    #     df,
+    #     x = 'x',
+    #     y = 'y',
+    #     color = 'label',
+    #     # size = 5,
+    #     hover_data = ['ratios'],
+    #     title = ' xx '
     # )
 
-    fig.show()
+    # fig.show()
     
     return
 

@@ -453,9 +453,11 @@ def gen_sim_plot(P, class_label, method):
                 class_attr[i][j] = np.sum(P[i][j_index])
     
     # print(class_attr)
-    class_attr = class_attr.tolist()
+    ratios = class_attr / (class_attr.sum(axis=1, keepdims=True) + 1e-7)
+    # class_attr = class_attr.tolist()
+    ratios = ratios.tolist()
     with open('ratios.json', 'w') as f:
-        json.dump(class_attr, f)
+        json.dump(ratios, f, indent=2)
 
 
 def _gradient_descent(

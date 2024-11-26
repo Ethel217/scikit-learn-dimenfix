@@ -22,8 +22,8 @@
   <script>
     // Load the tsne and ratios data
     Promise.all([
-      d3.json('tsne_data.json'),
-      d3.json('ratios_data.json')
+      d3.json('embedding.json'),
+      d3.json('ratios.json')
     ]).then(([tsneData, ratiosData]) => {
       // Combine the t-SNE coordinates with the ratios
       tsneData.forEach((point, index) => {
