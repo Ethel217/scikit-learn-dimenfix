@@ -18,6 +18,8 @@ from scipy.spatial.distance import pdist, squareform
 
 from scipy.stats import norm
 
+from sklearn.manifold import MDS
+
 from ..base import (
     BaseEstimator,
     ClassNamePrefixFeaturesOutMixin,
@@ -379,12 +381,16 @@ def accumulate_move_force(p, range_limits, class_label, x_range, out=False):
     # print(range_limits_new[0, :])
     return range_limits
 
-def sim_class_P(P, class_label):
-    P = squareform(P) * 1000
+def sim_class_P(P, class_label, method):
+    if method == "exact":
+        P = squareform(P) * 10000
+    elif method == "barnes_hut":
+        P = P.toarray() * 10000
     # np.set_printoptions(precision=1)
     # print(P)
     # print(class_label)
     num_classes = len(np.unique(class_label))
+    classes = np.arange(num_classes)
 
     class_sim = np.zeros((num_classes, num_classes))
     for i in range(num_classes):
@@ -399,11 +405,22 @@ def sim_class_P(P, class_label):
                     sim += P[idx_i][idx_j]
                     cnt += 1
                     
-            class_sim[i][j] = sim / cnt
-            class_sim[j][i] = sim / cnt
+            # inversed here to represent distance
+            class_sim[i][j] = cnt / sim
+            class_sim[j][i] = cnt / sim
 
     np.set_printoptions(precision=1)
     print(class_sim)
+
+    # MDS to find the distance
+    # (non)metric from sklearn
+    mds = MDS(n_components=1, dissimilarity="precomputed", metric=False, random_state=42)
+    order = mds.fit_transform(class_sim)
+    print(order.flatten())
+
+    sorted_indices = np.argsort(order.flatten())
+    ordered_classes = classes[sorted_indices]
+    print(ordered_classes)
 
 
 def _gradient_descent(
@@ -1037,7 +1054,7 @@ class TSNEDimenfix(ClassNamePrefixFeaturesOutMixin, TransformerMixin, BaseEstima
         params = X_embedded.ravel()
 
         P_ = P.copy()
-        sim_class_P(P_, self.class_label)
+        sim_class_P(P_, self.class_label, self.method)
 
         opt_args = {
             "it": 0,

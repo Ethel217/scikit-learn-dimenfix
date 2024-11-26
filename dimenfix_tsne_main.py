@@ -50,7 +50,8 @@ def main():
     #     start = end
 
     start = timer()
-    y = TSNEDimenfix(n_components=2, learning_rate='auto', init='random', perplexity=10, method="exact", \
+    y = TSNEDimenfix(n_components=2, learning_rate='auto', init='random', perplexity=10, \
+                    #  method="exact", \
                       dimenfix=True, range_limits=range_limits, class_ordering=False, class_label=label, fix_iter=50, mode="gaussian", early_push=False).fit_transform(X)
     end = timer()
     # print(f"{trustworthiness(X, y, n_neighbors=20):.3f}")
