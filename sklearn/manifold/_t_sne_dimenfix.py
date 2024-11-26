@@ -381,7 +381,8 @@ def accumulate_move_force(p, range_limits, class_label, x_range, out=False):
     # print(range_limits_new[0, :])
     return range_limits
 
-def sim_class_P(P, class_label, method):
+def sim_class_P(P, class_label, method, range_limits):
+    # return the class order based on class similarity, and the new range limit for each class
     if method == "exact":
         P = squareform(P) * 10000
     elif method == "barnes_hut":
@@ -391,11 +392,14 @@ def sim_class_P(P, class_label, method):
     # print(class_label)
     num_classes = len(np.unique(class_label))
     classes = np.arange(num_classes)
+    class_range = np.zeros((num_classes, 2))
 
     class_sim = np.zeros((num_classes, num_classes))
     for i in range(num_classes):
+        i_index = np.where(class_label == i)[0]
+        class_range[i][0] = range_limits[i_index[0]][0]
+        class_range[i][1] = range_limits[i_index[0]][1]
         for j in range(i + 1, num_classes):
-            i_index = np.where(class_label == i)[0]
             j_index = np.where(class_label == j)[0]
 
             cnt = 0
@@ -409,8 +413,10 @@ def sim_class_P(P, class_label, method):
             class_sim[i][j] = cnt / sim
             class_sim[j][i] = cnt / sim
 
+    class_range = class_range[class_range[:, 0].argsort()]
     np.set_printoptions(precision=1)
-    print(class_sim)
+    # print(class_sim)
+    print(class_range)
 
     # MDS to find the distance
     # (non)metric from sklearn
@@ -421,6 +427,8 @@ def sim_class_P(P, class_label, method):
     sorted_indices = np.argsort(order.flatten())
     ordered_classes = classes[sorted_indices]
     print(ordered_classes)
+
+    return ordered_classes, class_range
 
 
 def _gradient_descent(
@@ -505,11 +513,14 @@ def _gradient_descent(
             # rescale, also align with center at 0
             p[:, 0] = (p[:, 0] - (np.max(p[:, 0]) + np.min(p[:, 0])) / 2) * scaling_factor
 
-            # TODO: reorder by editing range_limits
-            if class_ordering is True:
+            # reorder by editing range_limits
+            if class_ordering == "disable":
+                pass
                 # range_limits = accumulate_move_force(p, range_limits, class_label, x_range)
-                # pass
+            elif class_ordering == "avg":
                 range_limits = avg_pos(p, range_limits, class_label)
+            elif class_ordering == "p_sim": # already reordered when init
+                pass
 
             # push into bins
             lower_bound = np.min(p[:, 0])
@@ -532,8 +543,6 @@ def _gradient_descent(
                 # clipped = np.clip(p[:, 0], lower_bound + (range_limits[:, 0] / 100) * x_range, lower_bound + (range_limits[:, 1] / 100) * x_range)
                 # diff = p[:, 0] - clipped
                 # apply gaussian on diff
-                
-                
 
                 # ori_pos = lower_bound + (range_limits[:, 0] + range_limits[:, 1]) * x_range / 200
                 # update_ = update.copy()
@@ -728,11 +737,13 @@ def plotIntermediate(p, it, label=None, show=False, save=False, name="default"):
     plt.figure(figsize=(8, 6))
     if label is not None:
         plt.scatter(p_reshaped[:, 1], p_reshaped[:, 0], c=label.astype(int), cmap='tab10', edgecolor='face', s=10)
-        plt.ylim(np.min(p_reshaped[:, 0]), np.max(p_reshaped[:, 0]))
+        pic_size = np.max(p_reshaped[:, 0]) - np.min(p_reshaped[:, 0])
+        plt.ylim(np.min(p_reshaped[:, 0]) - pic_size * 0.02, np.max(p_reshaped[:, 0]) + pic_size * 0.02)
         plt.colorbar()
     else:
         plt.scatter(p_reshaped[:, 1], p_reshaped[:, 0], edgecolor='face', s=10)
-        plt.ylim(p_reshaped[:, 0].min(), p_reshaped[:, 0].max())
+        pic_size = np.max(p_reshaped[:, 0]) - np.min(p_reshaped[:, 0])
+        plt.ylim(np.min(p_reshaped[:, 0]) - pic_size * 0.02, np.max(p_reshaped[:, 0]) + pic_size * 0.02)
     plt.title(f"Intermediate iteration: {it}")
     if save:
         plt.savefig(f'.\\figures\\iter_{it}_{name}.png', dpi=300, bbox_inches='tight')
@@ -798,7 +809,7 @@ class TSNEDimenfix(ClassNamePrefixFeaturesOutMixin, TransformerMixin, BaseEstima
         # dimenfix related params
         dimenfix=False,
         range_limits=None,
-        class_ordering=False,
+        class_ordering="disable",
         class_label=None,
         fix_iter=30,
         mode="clip",
@@ -1054,7 +1065,14 @@ class TSNEDimenfix(ClassNamePrefixFeaturesOutMixin, TransformerMixin, BaseEstima
         params = X_embedded.ravel()
 
         P_ = P.copy()
-        sim_class_P(P_, self.class_label, self.method)
+        sim_order, class_range = sim_class_P(P_, self.class_label, self.method, self.range_limits)
+        if self.class_ordering == "p_sim":
+            unique_classes = np.unique(self.class_label)
+            for i in unique_classes:
+                range_i = class_range[np.where(sim_order == i)[0][0]]
+                print(range_i)
+                i_index = np.where(self.class_label == i)[0]
+                self.range_limits[i_index] = range_i
 
         opt_args = {
             "it": 0,
