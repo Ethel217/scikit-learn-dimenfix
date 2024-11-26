@@ -20,58 +20,67 @@
   <div class="scatter-plot" id="scatter-plot"></div>
   
   <script>
-    // Example data
-    let tsne_data = [
-      { x: 0.1, y: 0.2, ratios: [0.3, 0.4, 0.3] },
-      { x: 0.4, y: 0.5, ratios: [0.2, 0.5, 0.3] },
-      { x: 0.7, y: 0.8, ratios: [0.1, 0.7, 0.2] },
-      // Add more points as needed
-    ];
+    // Load the tsne and ratios data
+    Promise.all([
+      d3.json('tsne_data.json'),
+      d3.json('ratios_data.json')
+    ]).then(([tsneData, ratiosData]) => {
+      // Combine the t-SNE coordinates with the ratios
+      tsneData.forEach((point, index) => {
+        point.ratios = ratiosData[index]; // Assuming the same index for matching
+      });
 
-    // Set up the SVG container
-    const svgWidth = 800, svgHeight = 600;
-    const svg = d3.select("#scatter-plot")
-                  .append("svg")
-                  .attr("width", svgWidth)
-                  .attr("height", svgHeight);
-
-    // Define the color scale for the pie chart
-    const colorScale = d3.scaleOrdinal()
-                         .domain([0, 1, 2])
-                         .range(["#FF6347", "#4682B4", "#32CD32"]); // Red, Blue, Green
-
-    // Function to generate pie chart SVG for each point
-    function generatePieChart(ratios) {
-      const pie = d3.pie().value(d => d)(ratios);
-      const arc = d3.arc().innerRadius(10).outerRadius(20);  // Small pie chart
-
-      return d3.select(document.createElementNS('http://www.w3.org/2000/svg', 'svg'))
-               .attr("width", 40)
-               .attr("height", 40)
-               .selectAll("path")
-               .data(pie)
-               .enter()
-               .append("path")
-               .attr("d", arc)
-               .attr("fill", d => colorScale(d.index));
-    }
-
-    // Render the points and pie charts
-    tsne_data.forEach((point, index) => {
-      // Add scatter plot points
-      svg.append("circle")
-         .attr("cx", point.x * svgWidth)  // Scale to fit the SVG container
-         .attr("cy", point.y * svgHeight)
-         .attr("r", 5)
-         .attr("fill", "#000");
-
-      // Generate and position pie charts next to the points
-      const pieChart = generatePieChart(point.ratios);
-      svg.node().appendChild(pieChart.node());
-      d3.select(pieChart.node())
-        .attr("x", point.x * svgWidth - 20)  // Center the pie chart around the point
-        .attr("y", point.y * svgHeight - 20); // Adjust position
+      // Now tsneData contains both the coordinates and the ratio for each point
+      renderScatterPlotWithPieCharts(tsneData);
     });
+
+    // Function to render scatter plot and pie charts
+    function renderScatterPlotWithPieCharts(tsneData) {
+      // Set up the SVG container
+      const svgWidth = 800, svgHeight = 600;
+      const svg = d3.select("#scatter-plot")
+                    .append("svg")
+                    .attr("width", svgWidth)
+                    .attr("height", svgHeight);
+
+      // Define the color scale for the pie chart
+      const colorScale = d3.scaleOrdinal()
+                           .domain([0, 1, 2])
+                           .range(["#FF6347", "#4682B4", "#32CD32"]); // Red, Blue, Green
+
+      // Function to generate pie chart SVG for each point
+      function generatePieChart(ratios) {
+        const pie = d3.pie().value(d => d)(ratios);
+        const arc = d3.arc().innerRadius(10).outerRadius(20);  // Small pie chart
+
+        return d3.select(document.createElementNS('http://www.w3.org/2000/svg', 'svg'))
+                 .attr("width", 40)
+                 .attr("height", 40)
+                 .selectAll("path")
+                 .data(pie)
+                 .enter()
+                 .append("path")
+                 .attr("d", arc)
+                 .attr("fill", d => colorScale(d.index));
+      }
+
+      // Render the points and pie charts
+      tsneData.forEach((point) => {
+        // Add scatter plot points
+        svg.append("circle")
+           .attr("cx", point.x * svgWidth)  // Scale to fit the SVG container
+           .attr("cy", point.y * svgHeight)
+           .attr("r", 5)
+           .attr("fill", "#000");
+
+        // Generate and position pie charts next to the points
+        const pieChart = generatePieChart(point.ratios);
+        svg.node().appendChild(pieChart.node());
+        d3.select(pieChart.node())
+          .attr("x", point.x * svgWidth - 20)  // Center the pie chart around the point
+          .attr("y", point.y * svgHeight - 20); // Adjust position
+      });
+    }
   </script>
 </body>
 </html>
