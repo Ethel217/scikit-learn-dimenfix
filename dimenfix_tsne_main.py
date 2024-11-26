@@ -1,6 +1,7 @@
 import sklearn.datasets as datasets
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 
 from timeit import default_timer as timer
 from datetime import timedelta
@@ -8,6 +9,9 @@ from sklearn import preprocessing
 from sklearn.manifold import TSNEDimenfix
 from sklearn.datasets import fetch_openml
 from sklearn.manifold import trustworthiness
+
+import json
+import plotly.express as px
 
 def main():
     # input dataset
@@ -53,7 +57,7 @@ def main():
     start = timer()
     y = TSNEDimenfix(n_components=2, learning_rate='auto', init='random', perplexity=10, \
                     #  method="exact", \
-                      dimenfix=True, range_limits=range_limits, class_ordering="p_sim", class_label=label, fix_iter=50, mode="gaussian", early_push=False).fit_transform(X)
+                      dimenfix=True, range_limits=range_limits, class_ordering="p_sim", class_label=label, fix_iter=50, mode="rescale", early_push=False).fit_transform(X)
     end = timer()
     # print(f"{trustworthiness(X, y, n_neighbors=20):.3f}")
 
@@ -68,6 +72,36 @@ def main():
     plt.savefig('.\\figures\\mnist_1000_band_fix.png', dpi=300, bbox_inches='tight')
     plt.show()
     # plt.clf()
+
+    
+
+    with open('ratios.json', 'r') as f:
+        class_attr = np.array(json.load(f))
+
+    ratios = class_attr / class_attr.sum(axis=1, keepdims=True)
+
+    df = pd.DataFrame(y, columns=['y', 'x'])
+    df['label'] = label
+    df['ratios'] = [list(r) for r in ratios]
+
+    fig = px.scatter(
+        df,
+        x = 'x',
+        y = 'y',
+        color = 'label',
+        # size = 5,
+        hover_data = ['ratios'],
+        title = ' xx '
+    )
+    
+    # fig.update_traces(
+    #     hoverinfo='text+label+vakue',
+    #     customdata=ratios,
+    #     textinfo='label+value+percent',
+    #     hovertemplate="<b>Sample index: %{customdata}</b><br>%{text}<extra></extra>"
+    # )
+
+    fig.show()
     
     return
 

@@ -11,6 +11,8 @@ from numbers import Integral, Real
 from time import time
 import matplotlib.pyplot as plt
 
+import json
+
 import numpy as np
 from scipy import linalg
 from scipy.sparse import csr_matrix, issparse
@@ -416,7 +418,7 @@ def sim_class_P(P, class_label, method, range_limits):
     class_range = class_range[class_range[:, 0].argsort()]
     np.set_printoptions(precision=1)
     # print(class_sim)
-    print(class_range)
+    # print(class_range)
 
     # MDS to find the distance
     # (non)metric from sklearn
@@ -429,6 +431,31 @@ def sim_class_P(P, class_label, method, range_limits):
     print(ordered_classes)
 
     return ordered_classes, class_range
+
+def gen_sim_plot(P, class_label, method):
+    # dont return anything, just save a json that can be visualized with plotly
+    if method == "exact":
+        P = squareform(P) * 10000
+    elif method == "barnes_hut":
+        P = P.toarray() * 10000
+    num_classes = len(np.unique(class_label))
+    classes = np.arange(num_classes)
+
+    print(class_label.shape)
+    class_attr = np.zeros((class_label.shape[0], num_classes))
+
+    for i in range(class_label.shape[0]):
+        for j in range(num_classes):
+            if j == class_label[i]:
+                continue
+            else:
+                j_index = np.where(class_label == j)[0]
+                class_attr[i][j] = np.sum(P[i][j_index])
+    
+    # print(class_attr)
+    class_attr = class_attr.tolist()
+    with open('ratios.json', 'w') as f:
+        json.dump(class_attr, f)
 
 
 def _gradient_descent(
@@ -1070,9 +1097,10 @@ class TSNEDimenfix(ClassNamePrefixFeaturesOutMixin, TransformerMixin, BaseEstima
             unique_classes = np.unique(self.class_label)
             for i in unique_classes:
                 range_i = class_range[np.where(sim_order == i)[0][0]]
-                print(range_i)
+                # print(range_i)
                 i_index = np.where(self.class_label == i)[0]
                 self.range_limits[i_index] = range_i
+        gen_sim_plot(P, self.class_label, self.method)
 
         opt_args = {
             "it": 0,
