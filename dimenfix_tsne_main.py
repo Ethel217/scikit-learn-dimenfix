@@ -57,7 +57,7 @@ def main():
     start = timer()
     y = TSNEDimenfix(n_components=2, learning_rate='auto', init='random', perplexity=10, \
                     #  method="exact", \
-                      dimenfix=True, range_limits=range_limits, class_ordering="p_sim", class_label=label, fix_iter=50, mode="rescale", early_push=False).fit_transform(X)
+                      dimenfix=True, range_limits=range_limits, class_ordering="p_sim", class_label=label, fix_iter=50, mode="gaussian", early_push=False).fit_transform(X)
     end = timer()
     # print(f"{trustworthiness(X, y, n_neighbors=20):.3f}")
 
@@ -74,8 +74,8 @@ def main():
     # plt.clf()
 
     # y = y.tolist()
-    embedding = [{"x": float(x_), "y": float(y_)} for x_, y_ in y]
-    with open('embedding.json', 'w') as f:
+    embedding = [{"x": float(y_), "y": float(x_)} for x_, y_ in y]
+    with open('.\\visualization\\embedding.json', 'w') as f:
         json.dump(embedding, f, indent=2)
 
     # with open('ratios.json', 'r') as f:

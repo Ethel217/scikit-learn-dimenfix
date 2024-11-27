@@ -1,0 +1,35 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>t-SNE Scatter Plot with Pie Charts</title>
+  <script src="https://d3js.org/d3.v6.min.js"></script>
+  <link rel="stylesheet" href="plot.css">
+</head>
+<body>
+  <!-- Main container for the scatter plot and legend -->
+  <div class="scatter-plot-container" id="scatter-plot-container"></div>
+
+  <script src="scatterPie.js"></script>
+  <script>
+    // Load the tsne and ratios data
+    Promise.all([
+      d3.json('embedding.json'),
+      d3.json('ratios.json')
+    ]).then(([tsneData, ratiosData]) => {
+      console.log('t-SNE Data:', tsneData);
+      console.log('Ratios Data:', ratiosData);
+
+      // Combine the t-SNE coordinates with the ratios
+      tsneData.forEach((point, index) => {
+        point.ratios = ratiosData[index]; // Assuming the same index for matching
+      });
+
+      // Now tsneData contains both the coordinates and the ratio for each point
+      renderScatterPlotWithPieCharts(tsneData, "#scatter-plot-container");
+    });
+  </script>
+</body>
+</html>

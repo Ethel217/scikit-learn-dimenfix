@@ -17,6 +17,7 @@ import numpy as np
 from scipy import linalg
 from scipy.sparse import csr_matrix, issparse
 from scipy.spatial.distance import pdist, squareform
+from scipy.linalg import svd
 
 from scipy.stats import norm
 
@@ -456,9 +457,47 @@ def gen_sim_plot(P, class_label, method):
     ratios = class_attr / (class_attr.sum(axis=1, keepdims=True) + 1e-7)
     # class_attr = class_attr.tolist()
     ratios = ratios.tolist()
-    with open('ratios.json', 'w') as f:
+    with open('.\\visualization\\ratios.json', 'w') as f:
         json.dump(ratios, f, indent=2)
 
+def rotate_centroids(p, range_limits, class_label):
+    embedding = p.copy()
+    p = p.reshape(range_limits[:, 0].shape[0], 2)
+
+    # calc class centroids
+    unique_labels = np.unique(class_label)
+    centroids = np.array([
+        np.mean(embedding[class_label == c], axis=0) for c in unique_labels
+    ])
+
+    # reorder based on range_limits
+    target_y_positions = []
+    for c in unique_labels:
+        class_indices = np.where(class_label == c)[0]
+        class_range_limits = range_limits[class_indices, :]
+        class_midpoint = np.mean(class_range_limits, axis=0).mean()  # Midpoint of the range
+        target_y_positions.append(class_midpoint)
+
+    target_y_positions = np.array(target_y_positions)
+
+    # calculate rotation + rotate embedding
+    reordered_centroids = centroids
+    current_y = reordered_centroids[:, 0]
+    target_y = target_y_positions
+
+    target_positions = np.column_stack((target_y, reordered_centroids[:, 1]))
+
+    centroids_centered = reordered_centroids - np.mean(reordered_centroids, axis=0)
+    target_centered = target_positions - np.mean(target_positions, axis=0)
+
+    cov_matrix = np.dot(centroids_centered.T, target_centered)
+
+    U, _, Vt = svd(cov_matrix)
+    rotation_matrix = np.dot(U, Vt)
+
+    embedding = np.dot(embedding, rotation_matrix)
+
+    return embedding
 
 def _gradient_descent(
     objective,
@@ -500,6 +539,8 @@ def _gradient_descent(
         print_iter = fix_iter
     else:
         print_iter = 50  # default print intermediate iters: 50
+    
+    first_push = True
 
     tic = time()
     for i in range(it, max_iter):
@@ -531,7 +572,7 @@ def _gradient_descent(
             p_ = p.copy()
             plotIntermediate(p_, it=i, label=class_label, save=True, name="init")
 
-        if dimenfix and i >= start_iter and i % fix_iter == 0 and range_limits is not None:
+        if dimenfix and i >= start_iter and (i % fix_iter == 0 or i == max_iter - 2) and range_limits is not None:
             
             p = p.reshape(range_limits[:, 0].shape[0], 2)
 
@@ -539,8 +580,8 @@ def _gradient_descent(
             current_range = np.max(p[:, 0]) - np.min(p[:, 0])
             x_range = (np.max(p[:, 1]) - np.min(p[:, 1]))
             scaling_factor = x_range / current_range if current_range != 0 else 1
-            # rescale, also align with center at 0
-            p[:, 0] = (p[:, 0] - (np.max(p[:, 0]) + np.min(p[:, 0])) / 2) * scaling_factor
+            # p[:, 0] = (p[:, 0] - (np.max(p[:, 0]) + np.min(p[:, 0])) / 2) * scaling_factor
+            p[:, 0] *= scaling_factor
 
             # reorder by editing range_limits
             if class_ordering == "disable":
@@ -550,6 +591,16 @@ def _gradient_descent(
                 range_limits = avg_pos(p, range_limits, class_label)
             elif class_ordering == "p_sim": # already reordered when init
                 pass
+            
+            # add a rotation before 1st push
+            if first_push:
+                first_push = False
+                p = rotate_centroids(p, range_limits, class_label)
+                p_ = p.copy()
+                plotIntermediate(p_.ravel(), it=i, label=class_label, save=True, name="rotated")
+            
+            # align at 0
+            p[:, 0] -= (np.max(p[:, 0]) + np.min(p[:, 0])) / 2
 
             # push into bins
             lower_bound = np.min(p[:, 0])
@@ -765,14 +816,14 @@ def plotIntermediate(p, it, label=None, show=False, save=False, name="default"):
     
     plt.figure(figsize=(8, 6))
     if label is not None:
-        plt.scatter(p_reshaped[:, 1], p_reshaped[:, 0], c=label.astype(int), cmap='tab10', edgecolor='face', s=10)
+        plt.scatter(p_reshaped[:, 1], p_reshaped[:, 0], c=label.astype(int), cmap='tab10', edgecolor='face', s=5)
         pic_size = np.max(p_reshaped[:, 0]) - np.min(p_reshaped[:, 0])
-        plt.ylim(np.min(p_reshaped[:, 0]) - pic_size * 0.02, np.max(p_reshaped[:, 0]) + pic_size * 0.02)
+        plt.ylim(np.min(p_reshaped[:, 0]) - pic_size * 0.01, np.max(p_reshaped[:, 0]) + pic_size * 0.01)
         plt.colorbar()
     else:
-        plt.scatter(p_reshaped[:, 1], p_reshaped[:, 0], edgecolor='face', s=10)
+        plt.scatter(p_reshaped[:, 1], p_reshaped[:, 0], edgecolor='face', s=5)
         pic_size = np.max(p_reshaped[:, 0]) - np.min(p_reshaped[:, 0])
-        plt.ylim(np.min(p_reshaped[:, 0]) - pic_size * 0.02, np.max(p_reshaped[:, 0]) + pic_size * 0.02)
+        plt.ylim(np.min(p_reshaped[:, 0]) - pic_size * 0.01, np.max(p_reshaped[:, 0]) + pic_size * 0.01)
     plt.title(f"Intermediate iteration: {it}")
     if save:
         plt.savefig(f'.\\figures\\iter_{it}_{name}.png', dpi=300, bbox_inches='tight')
