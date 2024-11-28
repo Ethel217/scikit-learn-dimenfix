@@ -445,19 +445,28 @@ def gen_sim_plot(P, class_label, method):
     print(class_label.shape)
     class_attr = np.zeros((class_label.shape[0], num_classes))
 
+    # without same class
+
+    # for i in range(class_label.shape[0]):
+    #     for j in range(num_classes):
+    #         if j == class_label[i]:
+    #             continue
+    #         else:
+    #             j_index = np.where(class_label == j)[0]
+    #             class_attr[i][j] = np.sum(P[i][j_index])
+
+    # with same class
+
     for i in range(class_label.shape[0]):
         for j in range(num_classes):
-            if j == class_label[i]:
-                continue
-            else:
-                j_index = np.where(class_label == j)[0]
-                class_attr[i][j] = np.sum(P[i][j_index])
+            j_index = np.where(class_label == j)[0]
+            class_attr[i][j] = np.sum(P[i][j_index])
     
     # print(class_attr)
     ratios = class_attr / (class_attr.sum(axis=1, keepdims=True) + 1e-7)
     # class_attr = class_attr.tolist()
     ratios = ratios.tolist()
-    with open('.\\visualization\\ratios.json', 'w') as f:
+    with open('.\\visualization\\ratios_withself.json', 'w') as f:
         json.dump(ratios, f, indent=2)
 
 def rotate_centroids(p, range_limits, class_label):
