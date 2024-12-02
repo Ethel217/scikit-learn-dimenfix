@@ -387,9 +387,9 @@ def accumulate_move_force(p, range_limits, class_label, x_range, out=False):
 def sim_class_P(P, class_label, method, range_limits):
     # return the class order based on class similarity, and the new range limit for each class
     if method == "exact":
-        P = squareform(P) * 10000
+        P = squareform(P)
     elif method == "barnes_hut":
-        P = P.toarray() * 10000
+        P = P.toarray()
     # np.set_printoptions(precision=1)
     # print(P)
     # print(class_label)
@@ -398,32 +398,40 @@ def sim_class_P(P, class_label, method, range_limits):
     class_range = np.zeros((num_classes, 2))
 
     class_sim = np.zeros((num_classes, num_classes))
+    inter_sim = np.zeros((P.shape[0], num_classes))
+
     for i in range(num_classes):
         i_index = np.where(class_label == i)[0]
         class_range[i][0] = range_limits[i_index[0]][0]
         class_range[i][1] = range_limits[i_index[0]][1]
-        for j in range(i + 1, num_classes):
+        for j in range(i, num_classes):
             j_index = np.where(class_label == j)[0]
 
             cnt = 0
             sim = 0
             for idx_i in i_index:
+                cnt += 1
+                temp = 0
                 for idx_j in j_index:
-                    sim += P[idx_i][idx_j]
-                    cnt += 1
+                    temp += P[idx_i][idx_j]
+                inter_sim[idx_i][j] = temp
+                sim += temp
+            # print(cnt)
+            sim /= cnt
                     
             # inversed here to represent distance
-            class_sim[i][j] = cnt / sim
-            class_sim[j][i] = cnt / sim
+            class_sim[i][j] = sim
+            class_sim[j][i] = sim
 
     class_range = class_range[class_range[:, 0].argsort()]
     np.set_printoptions(precision=1)
     # print(class_sim)
+    print(inter_sim.shape)
     # print(class_range)
 
     # MDS to find the distance
-    # (non)metric from sklearn
-    mds = MDS(n_components=1, dissimilarity="precomputed", metric=False, random_state=42)
+    # metric from sklearn
+    mds = MDS(n_components=1, dissimilarity="precomputed", random_state=42)
     order = mds.fit_transform(class_sim)
     print(order.flatten())
 
@@ -436,24 +444,27 @@ def sim_class_P(P, class_label, method, range_limits):
 def gen_sim_plot(P, class_label, method):
     # dont return anything, just save a json that can be visualized with plotly
     if method == "exact":
-        P = squareform(P) * 10000
+        P = squareform(P)
     elif method == "barnes_hut":
-        P = P.toarray() * 10000
+        P = P.toarray()
     num_classes = len(np.unique(class_label))
     classes = np.arange(num_classes)
 
-    print(class_label.shape)
+    # print(class_label.shape)
     class_attr = np.zeros((class_label.shape[0], num_classes))
 
     for i in range(class_label.shape[0]):
         for j in range(num_classes):
-            if j == class_label[i]:
-                continue
-            else:
-                j_index = np.where(class_label == j)[0]
-                class_attr[i][j] = np.sum(P[i][j_index])
-    
-    # print(class_attr)
+            # if j == class_label[i]:
+            #     continue
+            # else:
+            #     j_index = np.where(class_label == j)[0]
+            #     class_attr[i][j] = np.sum(P[i][j_index])
+            j_index = np.where(class_label == j)[0]
+            class_attr[i][j] = np.sum(P[i][j_index])
+
+    np.set_printoptions(threshold=np.inf, linewidth=np.inf)
+    print(class_attr)
     ratios = class_attr / (class_attr.sum(axis=1, keepdims=True) + 1e-7)
     # class_attr = class_attr.tolist()
     ratios = ratios.tolist()

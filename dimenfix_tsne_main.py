@@ -11,14 +11,14 @@ from sklearn.datasets import fetch_openml
 from sklearn.manifold import trustworthiness
 
 import json
-import plotly.express as px
+# import plotly.express as px
 
 def main():
     # input dataset
     mnist = fetch_openml('mnist_784', version=1, data_home=".\\scikit_learn_data")
     X = mnist.data.to_numpy()
     np.random.seed(42)
-    sample_indices = np.random.choice(X.shape[0], size=1000, replace=False)
+    sample_indices = np.random.choice(X.shape[0], size=5000, replace=False)
     X = X[sample_indices]
 
     label = mnist.target.to_numpy()
@@ -57,7 +57,7 @@ def main():
     start = timer()
     y = TSNEDimenfix(n_components=2, learning_rate='auto', init='random', perplexity=10, \
                     #  method="exact", \
-                      dimenfix=True, range_limits=range_limits, class_ordering="p_sim", class_label=label, fix_iter=50, mode="gaussian", early_push=False).fit_transform(X)
+                      dimenfix=True, range_limits=range_limits, class_ordering="p_sim", class_label=label, fix_iter=50, mode="rescale", early_push=False).fit_transform(X)
     end = timer()
     # print(f"{trustworthiness(X, y, n_neighbors=20):.3f}")
 
