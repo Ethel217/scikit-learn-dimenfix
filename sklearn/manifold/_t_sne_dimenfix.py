@@ -71,10 +71,13 @@ def _joint_probabilities(distances, desired_perplexity, verbose):
     conditional_P = _utils._binary_search_perplexity(
         distances, desired_perplexity, verbose
     )
+    CP = conditional_P.copy()
+    # print(CP.shape)
+    
     P = conditional_P + conditional_P.T
     sum_P = np.maximum(np.sum(P), MACHINE_EPSILON)
     P = np.maximum(squareform(P) / sum_P, MACHINE_EPSILON)
-    return P
+    return P, CP
 
 def _joint_probabilities_nn(distances, desired_perplexity, verbose):
     """Compute joint probabilities p_ij from distances using just nearest
@@ -113,6 +116,8 @@ def _joint_probabilities_nn(distances, desired_perplexity, verbose):
     conditional_P = _utils._binary_search_perplexity(
         distances_data, desired_perplexity, verbose
     )
+    CP = conditional_P.copy()
+    print(CP.shape)
     assert np.all(np.isfinite(conditional_P)), "All probabilities should be finite"
 
     # Symmetrize the joint probability distribution using sparse operations
@@ -130,7 +135,7 @@ def _joint_probabilities_nn(distances, desired_perplexity, verbose):
     if verbose >= 2:
         duration = time() - t0
         print("[t-SNE] Computed conditional probabilities in {:.3f}s".format(duration))
-    return P
+    return P, CP
 
 def _kl_divergence(
     params,
@@ -386,10 +391,10 @@ def accumulate_move_force(p, range_limits, class_label, x_range, out=False):
 
 def sim_class_P(P, class_label, method, range_limits):
     # return the class order based on class similarity, and the new range limit for each class
-    if method == "exact":
-        P = squareform(P)
-    elif method == "barnes_hut":
-        P = P.toarray()
+    # if method == "exact":
+    #     P = squareform(P)
+    # elif method == "barnes_hut":
+    #     P = P.toarray()
     # np.set_printoptions(precision=1)
     # print(P)
     # print(class_label)
@@ -398,13 +403,13 @@ def sim_class_P(P, class_label, method, range_limits):
     class_range = np.zeros((num_classes, 2))
 
     class_sim = np.zeros((num_classes, num_classes))
-    inter_sim = np.zeros((P.shape[0], num_classes))
+    # inter_sim = np.zeros((P.shape[0], num_classes))
 
     for i in range(num_classes):
         i_index = np.where(class_label == i)[0]
         class_range[i][0] = range_limits[i_index[0]][0]
         class_range[i][1] = range_limits[i_index[0]][1]
-        for j in range(i, num_classes):
+        for j in range(num_classes):
             j_index = np.where(class_label == j)[0]
 
             cnt = 0
@@ -414,39 +419,59 @@ def sim_class_P(P, class_label, method, range_limits):
                 temp = 0
                 for idx_j in j_index:
                     temp += P[idx_i][idx_j]
-                inter_sim[idx_i][j] = temp
-                sim += temp
-            # print(cnt)
+                # inter_sim[idx_i][j] = temp
+                sim += 1 - temp # change probability to distance
             sim /= cnt
                     
-            # inversed here to represent distance
+            # non-symmetrical
             class_sim[i][j] = sim
-            class_sim[j][i] = sim
+            # class_sim[j][i] = sim
 
     class_range = class_range[class_range[:, 0].argsort()]
-    np.set_printoptions(precision=1)
-    # print(class_sim)
-    print(inter_sim.shape)
+    # np.set_printoptions(precision=1)
+    print(class_sim)
+    # print(inter_sim)
     # print(class_range)
 
     # MDS to find the distance
     # metric from sklearn
-    mds = MDS(n_components=1, dissimilarity="precomputed", random_state=42)
-    order = mds.fit_transform(class_sim)
+    print("---   MDS for ordering   ---")
+    class_sim_sym = (class_sim + class_sim.T) / 2
+    mds = MDS(n_components=1, dissimilarity="precomputed", random_state=42, metric=False)
+    order = mds.fit_transform(class_sim_sym)
     print(order.flatten())
 
     sorted_indices = np.argsort(order.flatten())
     ordered_classes = classes[sorted_indices]
     print(ordered_classes)
 
+    mds_2d = MDS(n_components=2, dissimilarity="precomputed", random_state=42, metric=False)
+    order_2d = mds_2d.fit_transform(class_sim_sym)
+    
+    plt.figure()
+    plt.scatter(order_2d[:, 1], order_2d[:, 0], c=np.arange(num_classes), cmap='tab10', edgecolors='face', linewidths=0.5, s=40)
+    plt.colorbar()
+    plt.savefig('.\\figures\\p_sim_MDS_2d.png', dpi=300, bbox_inches='tight')
+    # plt.show()
+    # plt.clf()
+
+    pca = PCA(n_components=2)
+    pca_result = pca.fit_transform(order_2d)
+
+    plt.figure()
+    plt.scatter(pca_result[:, 1], pca_result[:, 0], c=np.arange(num_classes), cmap='tab10', edgecolors='face', linewidths=0.5, s=40)
+    plt.colorbar()
+    plt.savefig('.\\figures\\p_sim_MDS_2d_PCA.png', dpi=300, bbox_inches='tight')
+    # plt.show()
+
     return ordered_classes, class_range
 
 def gen_sim_plot(P, class_label, method):
     # dont return anything, just save a json that can be visualized with plotly
-    if method == "exact":
-        P = squareform(P)
-    elif method == "barnes_hut":
-        P = P.toarray()
+    # if method == "exact":
+    #     P = squareform(P)
+    # elif method == "barnes_hut":
+    #     P = P.toarray()
     num_classes = len(np.unique(class_label))
     classes = np.arange(num_classes)
 
@@ -455,37 +480,32 @@ def gen_sim_plot(P, class_label, method):
 
     # without same class
 
-    # for i in range(class_label.shape[0]):
-    #     for j in range(num_classes):
-    #         if j == class_label[i]:
-    #             continue
-    #         else:
-    #             j_index = np.where(class_label == j)[0]
-    #             class_attr[i][j] = np.sum(P[i][j_index])
+    for i in range(class_label.shape[0]):
+        for j in range(num_classes):
+            if j == class_label[i]:
+                continue
+            else:
+                j_index = np.where(class_label == j)[0]
+                class_attr[i][j] = np.sum(P[i][j_index])
 
     # with same class
 
-    for i in range(class_label.shape[0]):
-        for j in range(num_classes):
-            # if j == class_label[i]:
-            #     continue
-            # else:
-            #     j_index = np.where(class_label == j)[0]
-            #     class_attr[i][j] = np.sum(P[i][j_index])
-            j_index = np.where(class_label == j)[0]
-            class_attr[i][j] = np.sum(P[i][j_index])
+    # for i in range(class_label.shape[0]):
+    #     for j in range(num_classes):
+    #         j_index = np.where(class_label == j)[0]
+    #         class_attr[i][j] = np.sum(P[i][j_index])
 
-    np.set_printoptions(threshold=np.inf, linewidth=np.inf)
-    print(class_attr)
+    # np.set_printoptions(threshold=np.inf, linewidth=np.inf)
+    # print(class_attr)
     ratios = class_attr / (class_attr.sum(axis=1, keepdims=True) + 1e-7)
     # class_attr = class_attr.tolist()
     ratios = ratios.tolist()
-    with open('.\\visualization\\ratios_withself.json', 'w') as f:
+    with open('.\\visualization\\ratios.json', 'w') as f:
         json.dump(ratios, f, indent=2)
 
 def rotate_centroids(p, range_limits, class_label):
     embedding = p.copy()
-    p = p.reshape(range_limits[:, 0].shape[0], 2)
+    p = p.reshape(-1, 2)
 
     # calc class centroids
     unique_labels = np.unique(class_label)
@@ -606,6 +626,17 @@ def _gradient_descent(
             # p[:, 0] = (p[:, 0] - (np.max(p[:, 0]) + np.min(p[:, 0])) / 2) * scaling_factor
             p[:, 0] *= scaling_factor
 
+            # add a rotation before 1st push
+            if first_push:
+                first_push = False
+                # rotation 1: match origin to new order
+                # p = rotate_centroids(p, range_limits, class_label)
+                # rotation 2: apply 2d PCA
+                pca = PCA(n_components=2)
+                p = pca.fit_transform(p)
+                p_ = p.copy()
+                plotIntermediate(p_.ravel(), it=i, label=class_label, save=True, name="rotated")
+
             # reorder by editing range_limits
             if class_ordering == "disable":
                 pass
@@ -614,13 +645,6 @@ def _gradient_descent(
                 range_limits = avg_pos(p, range_limits, class_label)
             elif class_ordering == "p_sim": # already reordered when init
                 pass
-            
-            # add a rotation before 1st push
-            if first_push:
-                first_push = False
-                p = rotate_centroids(p, range_limits, class_label)
-                p_ = p.copy()
-                plotIntermediate(p_.ravel(), it=i, label=class_label, save=True, name="rotated")
             
             # align at 0
             p[:, 0] -= (np.max(p[:, 0]) + np.min(p[:, 0])) / 2
@@ -1044,7 +1068,7 @@ class TSNEDimenfix(ClassNamePrefixFeaturesOutMixin, TransformerMixin, BaseEstima
                 distances **= 2
 
             # compute the joint probability distribution for the input space
-            P = _joint_probabilities(distances, self.perplexity, self.verbose)
+            P, CP = _joint_probabilities(distances, self.perplexity, self.verbose)
             assert np.all(np.isfinite(P)), "All probabilities should be finite"
             assert np.all(P >= 0), "All probabilities should be non-negative"
             assert np.all(
@@ -1100,7 +1124,7 @@ class TSNEDimenfix(ClassNamePrefixFeaturesOutMixin, TransformerMixin, BaseEstima
             distances_nn.data **= 2
 
             # compute the joint probability distribution for the input space
-            P = _joint_probabilities_nn(distances_nn, self.perplexity, self.verbose)
+            P, CP = _joint_probabilities_nn(distances_nn, self.perplexity, self.verbose)
 
         if isinstance(self.init, np.ndarray):
             X_embedded = self.init
@@ -1143,6 +1167,7 @@ class TSNEDimenfix(ClassNamePrefixFeaturesOutMixin, TransformerMixin, BaseEstima
 
         return self._tsne(
             P,
+            CP,
             degrees_of_freedom,
             n_samples,
             X_embedded=X_embedded,
@@ -1153,6 +1178,7 @@ class TSNEDimenfix(ClassNamePrefixFeaturesOutMixin, TransformerMixin, BaseEstima
     def _tsne(
         self,
         P,
+        CP,
         degrees_of_freedom,
         n_samples,
         X_embedded,
@@ -1167,8 +1193,8 @@ class TSNEDimenfix(ClassNamePrefixFeaturesOutMixin, TransformerMixin, BaseEstima
         # * final optimization with momentum at 0.8
         params = X_embedded.ravel()
 
-        P_ = P.copy()
-        sim_order, class_range = sim_class_P(P_, self.class_label, self.method, self.range_limits)
+        CP_ = CP.copy()
+        sim_order, class_range = sim_class_P(CP_, self.class_label, self.method, self.range_limits)
         if self.class_ordering == "p_sim":
             unique_classes = np.unique(self.class_label)
             for i in unique_classes:
@@ -1176,7 +1202,7 @@ class TSNEDimenfix(ClassNamePrefixFeaturesOutMixin, TransformerMixin, BaseEstima
                 # print(range_i)
                 i_index = np.where(self.class_label == i)[0]
                 self.range_limits[i_index] = range_i
-        gen_sim_plot(P, self.class_label, self.method)
+        gen_sim_plot(CP, self.class_label, self.method)
 
         opt_args = {
             "it": 0,

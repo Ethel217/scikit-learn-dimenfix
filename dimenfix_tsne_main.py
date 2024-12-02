@@ -11,20 +11,31 @@ from sklearn.datasets import fetch_openml
 from sklearn.manifold import trustworthiness
 
 import json
-# import plotly.express as px
+from sklearn.preprocessing import StandardScaler
+from sklearn.datasets import load_wine
 
 def main():
-    # input dataset
-    mnist = fetch_openml('mnist_784', version=1, data_home=".\\scikit_learn_data")
-    X = mnist.data.to_numpy()
-    np.random.seed(42)
-    sample_indices = np.random.choice(X.shape[0], size=5000, replace=False)
-    X = X[sample_indices]
 
-    label = mnist.target.to_numpy()
-    label = label[sample_indices].astype(int)
+    # use wine dataset
+    wine = load_wine()
+    X = wine.data
+    label = wine.target.astype(int)
+    scaler = StandardScaler()
+    X = scaler.fit_transform(X)
 
-    X = preprocessing.MinMaxScaler().fit_transform(X)
+    # use MNIST dataset
+    # mnist = fetch_openml('mnist_784', version=1, data_home=".\\scikit_learn_data")
+    # X = mnist.data.to_numpy()
+    # np.random.seed(42)
+    # sample_indices = np.random.choice(X.shape[0], size=5000, replace=False)
+    # X = X[sample_indices]
+    # X = preprocessing.MinMaxScaler().fit_transform(X)
+
+    # label = mnist.target.to_numpy()
+    # label = label[sample_indices].astype(int)
+
+
+
     n_points = X.shape[0]
     print("Number of points:", n_points)
 
@@ -39,7 +50,7 @@ def main():
     range_limits = np.zeros((X.shape[0], 2))
     for l in unique_labels:
         range_limits[label == l] = [l * range_width, (l + 1) * range_width]
-    print(range_limits.shape)
+    # print(range_limits.shape)
 
     # band scale with class density ver
     # total_count = counts.sum()
@@ -56,8 +67,8 @@ def main():
 
     start = timer()
     y = TSNEDimenfix(n_components=2, learning_rate='auto', init='random', perplexity=10, \
-                    #  method="exact", \
-                      dimenfix=True, range_limits=range_limits, class_ordering="p_sim", class_label=label, fix_iter=50, mode="rescale", early_push=False).fit_transform(X)
+                     method="exact", \
+                      dimenfix=True, range_limits=range_limits, class_ordering="avg", class_label=label, fix_iter=50, mode="rescale", early_push=False).fit_transform(X)
     end = timer()
     # print(f"{trustworthiness(X, y, n_neighbors=20):.3f}")
 
@@ -70,7 +81,7 @@ def main():
     pic_size = np.max(y[:, 0]) - np.min(y[:, 0])
     plt.ylim(np.min(y[:, 0]) - pic_size * 0.01, np.max(y[:, 0]) + pic_size * 0.01)
     plt.colorbar()
-    plt.savefig('.\\figures\\mnist_1000_band_fix.png', dpi=300, bbox_inches='tight')
+    plt.savefig('.\\figures\\mushroom_fix_cap_color.png', dpi=300, bbox_inches='tight')
     plt.show()
     # plt.clf()
 
