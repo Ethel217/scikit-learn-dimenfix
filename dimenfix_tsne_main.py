@@ -66,9 +66,10 @@ def main():
     print('Dimenfix TSNE with class ordering took {0} to execute'.format(timedelta(seconds=end - start)))
 
     plt.figure()
-    plt.scatter(y[:, 1], y[:, 0], c=label, cmap='tab10', edgecolors='face', linewidths=0.5, s=12)
+    plt.scatter(y[:, 1], y[:, 0], c=label, cmap='tab10', edgecolors='face', linewidths=0.5, s=7)
+    pic_size = np.max(y[:, 0]) - np.min(y[:, 0])
+    plt.ylim(np.min(y[:, 0]) - pic_size * 0.01, np.max(y[:, 0]) + pic_size * 0.01)
     plt.colorbar()
-    plt.grid(linestyle='dotted')
     plt.savefig('.\\figures\\mnist_1000_band_fix.png', dpi=300, bbox_inches='tight')
     plt.show()
     # plt.clf()
