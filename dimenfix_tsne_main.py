@@ -13,26 +13,33 @@ from sklearn.manifold import trustworthiness
 import json
 from sklearn.preprocessing import StandardScaler
 from sklearn.datasets import load_wine
+from sklearn.datasets import load_breast_cancer
 
 def main():
 
     np.random.seed(42)
 
     # use wine dataset
-    wine = load_wine()
-    X = wine.data
-    label = wine.target.astype(int)
-    scaler = StandardScaler()
-    X = scaler.fit_transform(X)
+    # wine = load_wine()
+    # X = wine.data
+    # label = wine.target.astype(int)
+    # scaler = StandardScaler()
+    # X = scaler.fit_transform(X)
+
+    # use breast cancer dataset
+    # bc = load_breast_cancer()
+    # X = bc.data
+    # X = preprocessing.MinMaxScaler().fit_transform(X)
+    # label = bc.target.astype(int)
 
     # use MNIST dataset
-    # mnist = fetch_openml('mnist_784', version=1, data_home=".\\scikit_learn_data")
-    # X = mnist.data.to_numpy()
-    # sample_indices = np.random.choice(X.shape[0], size=5000, replace=False)
-    # X = X[sample_indices]
-    # X = preprocessing.MinMaxScaler().fit_transform(X)
-    # label = mnist.target.to_numpy()
-    # label = label[sample_indices].astype(int)
+    mnist = fetch_openml('mnist_784', version=1, data_home=".\\scikit_learn_data")
+    X = mnist.data.to_numpy()
+    sample_indices = np.random.choice(X.shape[0], size=5000, replace=False)
+    X = X[sample_indices]
+    X = preprocessing.MinMaxScaler().fit_transform(X)
+    label = mnist.target.to_numpy()
+    label = label[sample_indices].astype(int)
 
     n_points = X.shape[0]
     print("Number of points:", n_points)
@@ -43,7 +50,7 @@ def main():
     print(f'Number of different labels: {n_labels}')
     print(f'Counts per label: {counts}')
 
-    # equally band ver
+    # equal bands ver
     range_width = 100 / n_labels
     range_limits = np.zeros((X.shape[0], 2))
     for l in unique_labels:
@@ -66,7 +73,7 @@ def main():
     start = timer()
     y = TSNEDimenfix(n_components=2, learning_rate='auto', init='random', perplexity=10, \
                      method="exact", \
-                      dimenfix=True, range_limits=range_limits, class_ordering="disable", class_label=label, fix_iter=50, mode="rescale", early_push=False).fit_transform(X)
+                      dimenfix=True, range_limits=range_limits, class_ordering="avg", class_label=label, fix_iter=50, mode="rescale", early_push=False).fit_transform(X)
     end = timer()
     # print(f"{trustworthiness(X, y, n_neighbors=20):.3f}")
 
@@ -87,27 +94,6 @@ def main():
     embedding = [{"x": float(y_), "y": float(x_)} for x_, y_ in y]
     with open('.\\visualization\\embedding.json', 'w') as f:
         json.dump(embedding, f, indent=2)
-
-    # with open('ratios.json', 'r') as f:
-    #     class_attr = np.array(json.load(f))
-
-    # ratios = class_attr / class_attr.sum(axis=1, keepdims=True)
-
-    # df = pd.DataFrame(y, columns=['y', 'x'])
-    # df['label'] = label
-    # df['ratios'] = [list(r) for r in ratios]
-
-    # fig = px.scatter(
-    #     df,
-    #     x = 'x',
-    #     y = 'y',
-    #     color = 'label',
-    #     # size = 5,
-    #     hover_data = ['ratios'],
-    #     title = ' xx '
-    # )
-
-    # fig.show()
     
     return
 

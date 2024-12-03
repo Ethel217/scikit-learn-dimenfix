@@ -20,20 +20,20 @@ def main():
     np.random.seed(42)
 
     # Wine dataset
-    wine = load_wine()
-    X = wine.data
-    label = wine.target.astype(int)
-    scaler = StandardScaler()
-    X = scaler.fit_transform(X)
+    # wine = load_wine()
+    # X = wine.data
+    # label = wine.target.astype(int)
+    # scaler = StandardScaler()
+    # X = scaler.fit_transform(X)
 
     # MNIST dataset
-    # mnist = fetch_openml('mnist_784', version=1, data_home=".\\scikit_learn_data")
-    # X = mnist.data.to_numpy()
-    # sample_indices = np.random.choice(X.shape[0], size=1000, replace=False)
-    # X = X[sample_indices]
-    # label = mnist.target.to_numpy()
-    # label = label[sample_indices].astype(int)
-    # X = preprocessing.MinMaxScaler().fit_transform(X)
+    mnist = fetch_openml('mnist_784', version=1, data_home=".\\scikit_learn_data")
+    X = mnist.data.to_numpy()
+    sample_indices = np.random.choice(X.shape[0], size=5000, replace=False)
+    X = X[sample_indices]
+    X = preprocessing.MinMaxScaler().fit_transform(X)
+    label = mnist.target.to_numpy()
+    label = label[sample_indices].astype(int)
 
     n_points = X.shape[0]
     print("Number of points:", n_points)
