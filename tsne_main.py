@@ -9,48 +9,49 @@ from sklearn import preprocessing
 from sklearn.manifold import TSNE
 from sklearn.datasets import fetch_openml
 from sklearn.manifold import trustworthiness
+from sklearn.preprocessing import StandardScaler
+from sklearn.datasets import load_wine
 
 # test if scikitlearn is installed correctly
 
 
 def main():
-    # input dataset
-    mnist = fetch_openml('mnist_784', version=1, data_home=".\\scikit_learn_data")
-    # return
-    X = mnist.data.to_numpy()
-    sample_indices = np.random.choice(X.shape[0], size=1000, replace=False)
-    X = X[sample_indices]
-    label = mnist.target.to_numpy()
-    label = label[sample_indices].astype(int)
-    X = preprocessing.MinMaxScaler().fit_transform(X)
+
+    np.random.seed(42)
+
+    # Wine dataset
+    wine = load_wine()
+    X = wine.data
+    label = wine.target.astype(int)
+    scaler = StandardScaler()
+    X = scaler.fit_transform(X)
+
+    # MNIST dataset
+    # mnist = fetch_openml('mnist_784', version=1, data_home=".\\scikit_learn_data")
+    # X = mnist.data.to_numpy()
+    # sample_indices = np.random.choice(X.shape[0], size=1000, replace=False)
+    # X = X[sample_indices]
+    # label = mnist.target.to_numpy()
+    # label = label[sample_indices].astype(int)
+    # X = preprocessing.MinMaxScaler().fit_transform(X)
+
     n_points = X.shape[0]
     print("Number of points:", n_points)
 
-    # create movable range limits for each point: as percentage!!
-    unique_labels = np.unique(label)
-    n_labels = len(unique_labels)
-    print(f'Number of different labels: {n_labels}')
-    range_width = 100 / n_labels
-    range_limits = np.zeros((X.shape[0], 2))
-    for l in unique_labels:
-        range_limits[label == l] = [l * range_width, (l + 1) * range_width]
-    print(range_limits.shape)
-
     start = timer()
-    y = TSNE(n_components=2, learning_rate='auto', init='random', perplexity=10).fit_transform(X)
+    y = TSNE(n_components=2, learning_rate='auto', init='random', perplexity=10, method="exact").fit_transform(X)
     # y = DimenFixForceScheme(max_it=1000, fixed_feature=fixed_feature, alpha=0.8).fit_transform(X)
     end = timer()
     # print(f"{trustworthiness(X, y, n_neighbors=20):.3f}")
 
     print(np.amin(y, axis=0))
 
-    print('TSNE with class ordering took {0} to execute'.format(timedelta(seconds=end - start)))
+    print('Regular TSNE took {0} to execute'.format(timedelta(seconds=end - start)))
 
     plt.figure()
     plt.scatter(y[:, 1], y[:, 0], c=label, cmap='tab10', edgecolors='face', linewidths=0.5, s=12)
     plt.colorbar()
-    plt.grid(linestyle='dotted')
-    plt.savefig('.\\figures\\mnist_600_fix_scale_test_ori.png', dpi=300, bbox_inches='tight')
+    plt.savefig('.\\figures\\wine_regular_tsne_color_class.png', dpi=300, bbox_inches='tight')
     plt.show()
 
     return

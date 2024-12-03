@@ -428,8 +428,8 @@ def sim_class_P(P, class_label, method, range_limits):
             # class_sim[j][i] = sim
 
     class_range = class_range[class_range[:, 0].argsort()]
-    # np.set_printoptions(precision=1)
-    print(class_sim)
+    np.set_printoptions(precision=3)
+    # print(class_sim)
     # print(inter_sim)
     # print(class_range)
 
@@ -437,16 +437,23 @@ def sim_class_P(P, class_label, method, range_limits):
     # metric from sklearn
     print("---   MDS for ordering   ---")
     class_sim_sym = (class_sim + class_sim.T) / 2
-    mds = MDS(n_components=1, dissimilarity="precomputed", random_state=42, metric=False)
-    order = mds.fit_transform(class_sim_sym)
-    print(order.flatten())
+    # print(class_sim_sym)
+    # Contrast enhancement (with beta=3)
+    beta = 8
+    class_sim_sym = class_sim_sym ** beta
+    print(class_sim_sym)
+    # mds = MDS(n_components=1, dissimilarity="precomputed", random_state=42, metric=False)
+    # order = mds.fit_transform(class_sim_sym)
+    # print(order.flatten())
 
-    sorted_indices = np.argsort(order.flatten())
-    ordered_classes = classes[sorted_indices]
-    print(ordered_classes)
+    # sorted_indices = np.argsort(order.flatten())
+    
+    # ordered_classes = classes[sorted_indices]
+    # print(ordered_classes)
 
-    mds_2d = MDS(n_components=2, dissimilarity="precomputed", random_state=42, metric=False)
+    mds_2d = MDS(n_components=2, dissimilarity="precomputed", random_state=42)
     order_2d = mds_2d.fit_transform(class_sim_sym)
+    print(order_2d)
     
     plt.figure()
     plt.scatter(order_2d[:, 1], order_2d[:, 0], c=np.arange(num_classes), cmap='tab10', edgecolors='face', linewidths=0.5, s=40)
@@ -458,13 +465,16 @@ def sim_class_P(P, class_label, method, range_limits):
     pca = PCA(n_components=2)
     pca_result = pca.fit_transform(order_2d)
 
+    sorted_indices = np.argsort(pca_result[:, 0])
+    print(sorted_indices)
+
     plt.figure()
     plt.scatter(pca_result[:, 1], pca_result[:, 0], c=np.arange(num_classes), cmap='tab10', edgecolors='face', linewidths=0.5, s=40)
     plt.colorbar()
     plt.savefig('.\\figures\\p_sim_MDS_2d_PCA.png', dpi=300, bbox_inches='tight')
     # plt.show()
 
-    return ordered_classes, class_range
+    return sorted_indices, class_range
 
 def gen_sim_plot(P, class_label, method):
     # dont return anything, just save a json that can be visualized with plotly
@@ -615,7 +625,7 @@ def _gradient_descent(
             p_ = p.copy()
             plotIntermediate(p_, it=i, label=class_label, save=True, name="init")
 
-        if dimenfix and i >= start_iter and (i % fix_iter == 0 or i == max_iter - 2) and range_limits is not None:
+        if dimenfix and i >= start_iter and (i % fix_iter == 0 or i == max_iter - 5) and range_limits is not None:
             
             p = p.reshape(range_limits[:, 0].shape[0], 2)
 
@@ -631,17 +641,19 @@ def _gradient_descent(
                 first_push = False
                 # rotation 1: match origin to new order
                 # p = rotate_centroids(p, range_limits, class_label)
-                # rotation 2: apply 2d PCA
-                pca = PCA(n_components=2)
-                p = pca.fit_transform(p)
-                p_ = p.copy()
-                plotIntermediate(p_.ravel(), it=i, label=class_label, save=True, name="rotated")
+                
 
             # reorder by editing range_limits
             if class_ordering == "disable":
                 pass
                 # range_limits = accumulate_move_force(p, range_limits, class_label, x_range)
             elif class_ordering == "avg":
+                print(f"iter{i}")
+                # apply a rotation by pca every push/order
+                pca = PCA(n_components=2)
+                p = pca.fit_transform(p)
+                p_ = p.copy()
+                plotIntermediate(p_.ravel(), it=i, label=class_label, save=True, name="rotated")
                 range_limits = avg_pos(p, range_limits, class_label)
             elif class_ordering == "p_sim": # already reordered when init
                 pass
@@ -1193,9 +1205,9 @@ class TSNEDimenfix(ClassNamePrefixFeaturesOutMixin, TransformerMixin, BaseEstima
         # * final optimization with momentum at 0.8
         params = X_embedded.ravel()
 
-        CP_ = CP.copy()
-        sim_order, class_range = sim_class_P(CP_, self.class_label, self.method, self.range_limits)
         if self.class_ordering == "p_sim":
+            CP_ = CP.copy()
+            sim_order, class_range = sim_class_P(CP_, self.class_label, self.method, self.range_limits)
             unique_classes = np.unique(self.class_label)
             for i in unique_classes:
                 range_i = class_range[np.where(sim_order == i)[0][0]]
