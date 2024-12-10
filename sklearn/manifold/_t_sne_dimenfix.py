@@ -605,7 +605,6 @@ def _gradient_descent(
 
         # plot init
         if i == 0:
-            print("000000000000000000000000000")
             p_ = p.copy()
             plotIntermediate(p_.ravel(), it=i, label=class_label, save=True, name="00")
 
@@ -652,6 +651,7 @@ def _gradient_descent(
             # reorder by editing range_limits
             if class_ordering == "disable":
                 pass
+                # TODO: CALL rotation tests in small angles (only accompany fixed order: either class or fixed values)
                 # range_limits = accumulate_move_force(p, range_limits, class_label, x_range)
             elif class_ordering == "avg" or class_ordering == "p_sim":
                 print(f"iter{i}")
@@ -896,6 +896,31 @@ def plotIntermediate(p, it, label=None, show=False, save=False, name="default"):
         plt.show()
     plt.close()
 
+def adjust_range_class_density_based(range_limits, class_label):
+    new_range_limits = np.zeros((class_label.shape[0], 2))
+    import numpy as np
+
+def adjust_range_class_density_based(range_limits, class_label):
+    # TODO: not accounting for class input order (used default order)
+    new_range_limits = np.zeros_like(range_limits)
+
+    unique_classes, counts = np.unique(class_label, return_counts=True)
+    
+    total_points = class_label.shape[0]
+    class_density = counts / total_points
+
+    class_density = class_density * 100 / np.sum(class_density)
+
+    current_start = 0.0
+
+    for i, cls in enumerate(unique_classes):
+        range_size = class_density[i]
+        new_range_limits[class_label == cls, 0] = current_start
+        new_range_limits[class_label == cls, 1] = current_start + range_size
+        current_start += range_size
+
+    return new_range_limits
+
 class TSNEDimenfix(ClassNamePrefixFeaturesOutMixin, TransformerMixin, BaseEstimator):
 
     _parameter_constraints: dict = {
@@ -986,6 +1011,10 @@ class TSNEDimenfix(ClassNamePrefixFeaturesOutMixin, TransformerMixin, BaseEstima
         self.fix_iter = fix_iter
         self.mode = mode
         self.early_push = early_push
+
+        # fit range with density here
+        if density_adj:
+            self.range_limits = adjust_range_class_density_based(self.range_limits, self.class_label)
 
     def _check_params_vs_input(self, X):
         if self.perplexity >= X.shape[0]:
@@ -1241,6 +1270,7 @@ class TSNEDimenfix(ClassNamePrefixFeaturesOutMixin, TransformerMixin, BaseEstima
 
             # shorten early exaggeration
             self._EXPLORATION_MAX_ITER = 10
+            self._max_iter -= 250 - self._EXPLORATION_MAX_ITER
 
         gen_sim_plot(CP, self.class_label, self.method)
 
