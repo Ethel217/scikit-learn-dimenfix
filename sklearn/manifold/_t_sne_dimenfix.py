@@ -420,7 +420,7 @@ def sim_class_P(P, class_label, method, range_limits):
                 for idx_j in j_index:
                     temp += P[idx_i][idx_j]
                 # inter_sim[idx_i][j] = temp
-                sim += 1 - temp # change probability to distance
+                sim += temp
             sim /= cnt
                     
             # non-symmetrical
@@ -438,21 +438,26 @@ def sim_class_P(P, class_label, method, range_limits):
     print("---   MDS for ordering   ---")
     class_sim_sym = (class_sim + class_sim.T) / 2
     # print(class_sim_sym)
-    # Contrast enhancement (with beta=3)
-    beta = 8
-    class_sim_sym = class_sim_sym ** beta
-    print(class_sim_sym)
-    # mds = MDS(n_components=1, dissimilarity="precomputed", random_state=42, metric=False)
-    # order = mds.fit_transform(class_sim_sym)
-    # print(order.flatten())
 
-    # sorted_indices = np.argsort(order.flatten())
-    
-    # ordered_classes = classes[sorted_indices]
-    # print(ordered_classes)
+    # # ver1: Contrast enhancement (with beta=3)
+    # class_sim_sym = 1 - class_sim_sym
+    # beta = 8
+    # class_sim_sym = class_sim_sym ** beta
+    # print(class_sim_sym)
+
+    # ver2: Mask diagonal + normalize
+    np.fill_diagonal(class_sim_sym, 0)
+    class_sim_sym = class_sim_sym / np.sum(class_sim_sym)
+
+    normalized_similarity = class_sim_sym / np.max(class_sim_sym)
+    distance_matrix = np.sqrt(1 - normalized_similarity)
+    np.fill_diagonal(distance_matrix, 0)
+    print(distance_matrix)
+
+    print("---   2d MDS   ---")
 
     mds_2d = MDS(n_components=2, dissimilarity="precomputed", random_state=42)
-    order_2d = mds_2d.fit_transform(class_sim_sym)
+    order_2d = mds_2d.fit_transform(distance_matrix)
     print(order_2d)
     
     plt.figure()
@@ -600,6 +605,7 @@ def _gradient_descent(
 
         # plot init
         if i == 0:
+            print("000000000000000000000000000")
             p_ = p.copy()
             plotIntermediate(p_.ravel(), it=i, label=class_label, save=True, name="00")
 
@@ -647,7 +653,7 @@ def _gradient_descent(
             if class_ordering == "disable":
                 pass
                 # range_limits = accumulate_move_force(p, range_limits, class_label, x_range)
-            elif class_ordering == "avg":
+            elif class_ordering == "avg" or class_ordering == "p_sim":
                 print(f"iter{i}")
                 # apply a rotation by pca every push/order
                 pca = PCA(n_components=2)
@@ -655,8 +661,8 @@ def _gradient_descent(
                 p_ = p.copy()
                 plotIntermediate(p_.ravel(), it=i, label=class_label, save=True, name="rotated")
                 range_limits = avg_pos(p, range_limits, class_label)
-            elif class_ordering == "p_sim": # already reordered when init
-                pass
+            # elif class_ordering == "p_sim": # already reordered when init
+            #     pass
             
             # align at 0
             p[:, 0] -= (np.max(p[:, 0]) + np.min(p[:, 0])) / 2
@@ -948,6 +954,7 @@ class TSNEDimenfix(ClassNamePrefixFeaturesOutMixin, TransformerMixin, BaseEstima
         # dimenfix related params
         dimenfix=False,
         range_limits=None,
+        density_adj=False,
         class_ordering="disable",
         class_label=None,
         fix_iter=30,
@@ -973,6 +980,7 @@ class TSNEDimenfix(ClassNamePrefixFeaturesOutMixin, TransformerMixin, BaseEstima
         # dimenfix related params
         self.dimenfix = dimenfix
         self.range_limits = range_limits
+        self.density_adj = density_adj
         self.class_ordering = class_ordering
         self.class_label = class_label
         self.fix_iter = fix_iter
@@ -1081,6 +1089,10 @@ class TSNEDimenfix(ClassNamePrefixFeaturesOutMixin, TransformerMixin, BaseEstima
 
             # compute the joint probability distribution for the input space
             P, CP = _joint_probabilities(distances, self.perplexity, self.verbose)
+            # sum_P = np.sum(P)
+            # print("Sum of P:", sum_P)
+            # sum_CP = np.sum(CP)
+            # print("Sum of CP:", sum_CP)
             assert np.all(np.isfinite(P)), "All probabilities should be finite"
             assert np.all(P >= 0), "All probabilities should be non-negative"
             assert np.all(
@@ -1203,7 +1215,7 @@ class TSNEDimenfix(ClassNamePrefixFeaturesOutMixin, TransformerMixin, BaseEstima
         # we use is batch gradient descent with two stages:
         # * initial optimization with early exaggeration and momentum at 0.5
         # * final optimization with momentum at 0.8
-        params = X_embedded.ravel()
+        
 
         if self.class_ordering == "p_sim":
             CP_ = CP.copy()
@@ -1214,7 +1226,25 @@ class TSNEDimenfix(ClassNamePrefixFeaturesOutMixin, TransformerMixin, BaseEstima
                 # print(range_i)
                 i_index = np.where(self.class_label == i)[0]
                 self.range_limits[i_index] = range_i
+            
+            # change init to band
+            random_state = check_random_state(self.random_state)
+            x_coords = random_state.uniform(low=0.0, high=1.0, size=n_samples) #[1]
+            y_coords = np.array([
+                random_state.uniform(low=y_min, high=y_max) 
+                for y_min, y_max in self.range_limits
+            ])
+            # normalized y_coords to size 1 as x
+            y_min_global, y_max_global = np.min(y_coords), np.max(y_coords)
+            y_coords = (y_coords - y_min_global) / (y_max_global - y_min_global)
+            X_embedded = np.column_stack((y_coords, x_coords)).astype(np.float32)
+
+            # shorten early exaggeration
+            self._EXPLORATION_MAX_ITER = 10
+
         gen_sim_plot(CP, self.class_label, self.method)
+
+        params = X_embedded.ravel()
 
         opt_args = {
             "it": 0,
