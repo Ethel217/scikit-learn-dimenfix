@@ -19,41 +19,41 @@ def main():
 
     np.random.seed(42)
 
-    # use wine dataset
-    wine = load_wine()
-    X = wine.data
-    label = wine.target.astype(int)
-    scaler = StandardScaler()
-    X = scaler.fit_transform(X)
+    # # use wine dataset
+    # wine = load_wine()
+    # X = wine.data
+    # label = wine.target.astype(int)
+    # scaler = StandardScaler()
+    # X = scaler.fit_transform(X)
 
     # use iris dataset
-    # iris = load_iris()
-    # X = iris.data
-    # label = iris.target.astype(int)
-    # X = preprocessing.MinMaxScaler().fit_transform(X)
+    iris = load_iris()
+    X = iris.data
+    label = iris.target.astype(int)
+    X = preprocessing.MinMaxScaler().fit_transform(X)
 
     n_points = X.shape[0]
     print("Number of points:", n_points)
 
     # iris: fix Sepal width [1]
-    # sepal_width = X[:, 1]
-    # sepal_width = preprocessing.MinMaxScaler(feature_range=(0, 100)).fit_transform(sepal_width.reshape(-1, 1)).flatten()
-    # # hard fix to exact value
-    # range_limits = np.column_stack((sepal_width, sepal_width))
+    sepal_width = X[:, 1]
+    sepal_width = preprocessing.MinMaxScaler(feature_range=(0, 100)).fit_transform(sepal_width.reshape(-1, 1)).flatten()
+    # hard fix to exact value
+    range_limits = np.column_stack((sepal_width, sepal_width))
     # print("Range limits:\n", range_limits)
 
-    # wine: fix non-flavanoid_phenols [7]
-    non_flav = X[:, 1]
-    non_flav = preprocessing.MinMaxScaler(feature_range=(0, 100)).fit_transform(non_flav.reshape(-1, 1)).flatten()
-    # hard fix to exact value
-    range_limits = np.column_stack((non_flav, non_flav))
+    # # wine: fix non-flavanoid_phenols [7]
+    # non_flav = X[:, 1]
+    # non_flav = preprocessing.MinMaxScaler(feature_range=(0, 100)).fit_transform(non_flav.reshape(-1, 1)).flatten()
+    # # hard fix to exact value
+    # range_limits = np.column_stack((non_flav, non_flav))
 
     print(range_limits.shape)
 
     start = timer()
     y = TSNEDimenfix(n_components=2, learning_rate='auto', init='random', perplexity=10, \
                      method="exact", \
-                     range_limits=range_limits, dimenfix=True, class_ordering="disable", class_label=label, fix_iter=50, mode="gaussian", early_push=True).fit_transform(X)
+                     range_limits=range_limits, dimenfix=True, class_ordering="disable", class_label=label, fix_iter=50, mode="clip", early_push=True).fit_transform(X)
     end = timer()
     # print(f"{trustworthiness(X, y, n_neighbors=20):.3f}")
 

@@ -329,6 +329,7 @@ def avg_pos(p, range_limits, class_label):
     return new_range_limits
 
 def accumulate_move_force(p, range_limits, class_label, x_range, out=False):
+    # unused for now
     p = p.reshape(range_limits[:, 0].shape[0], 2)
 
     # use clipping to estimate force: + up - down
@@ -557,6 +558,42 @@ def rotate_centroids(p, range_limits, class_label):
 
     return embedding
 
+def rotate_for_min_push(p, range_limits, it):
+    # rotation tests in small angles (only accompany fixed order: either class or fixed values)
+    # best_p = p.copy()
+    min_push = float('inf')
+    best_angle = 0
+    # only return the best rotation in degrees
+    # 45 each
+    rotations = [0, 45, 90, 135, 180, 225, 270, 315]
+    for angle in rotations:
+        p_ = p.copy()
+        radians = np.deg2rad(angle)
+        rotation_matrix = np.array([[np.cos(radians), -np.sin(radians)],
+                                 [np.sin(radians), np.cos(radians)]])
+        # print(rotation_matrix)
+
+        # rotate p_
+        rotated_embedding = np.dot(p_, rotation_matrix.T)
+
+        # calculate push based on clip mode: clip accumulated
+        lower_bound = np.min(p[:, 0])
+        x_range = (np.max(p[:, 1]) - np.min(p[:, 1]))
+        original_values = rotated_embedding[:, 0]
+        clipped_values = np.clip(original_values, lower_bound + (range_limits[:, 0] / 100) * x_range, lower_bound + (range_limits[:, 1] / 100) * x_range)
+        abs_clipping_amounts = np.sum(np.abs(original_values - clipped_values))
+
+        # only save min
+        if abs_clipping_amounts < min_push:
+            min_push = abs_clipping_amounts
+            # best_p = rotated_embedding.copy()
+            best_angle = angle
+    
+    if best_angle != 0:
+        print(best_angle)
+
+    return best_angle
+
 def _gradient_descent(
     objective,
     p0,
@@ -640,29 +677,34 @@ def _gradient_descent(
             scaling_factor = x_range / current_range if current_range != 0 else 1
             # p[:, 0] = (p[:, 0] - (np.max(p[:, 0]) + np.min(p[:, 0])) / 2) * scaling_factor
             p[:, 0] *= scaling_factor
-
-            # add a rotation before 1st push
-            if first_push:
-                first_push = False
-                # rotation 1: match origin to new order
-                # p = rotate_centroids(p, range_limits, class_label)
                 
-
             # reorder by editing range_limits
             if class_ordering == "disable":
-                pass
-                # TODO: CALL rotation tests in small angles (only accompany fixed order: either class or fixed values)
+                # if first_push:
+                #     first_push = False
+                #     p = rotate_for_min_push(p, range_limits)
+                #     p_ = p.copy()
+                #     plotIntermediate(p_.ravel(), it=i, label=class_label, save=True, name="rotated")
+                angle = rotate_for_min_push(p, range_limits, it=i)
+                radians = np.deg2rad(angle)
+                rotation_matrix = np.array([[np.cos(radians), -np.sin(radians)],
+                                         [np.sin(radians), np.cos(radians)]])
+
+        # rotate p_
+                p = np.dot(p, rotation_matrix.T)
+                p_ = p.copy()
+                plotIntermediate(p_.ravel(), it=i, label=class_label, save=True, name="rotated")
                 # range_limits = accumulate_move_force(p, range_limits, class_label, x_range)
+
             elif class_ordering == "avg" or class_ordering == "p_sim":
                 print(f"iter{i}")
                 # apply a rotation by pca every push/order
+                # can also change to only rotate once
                 pca = PCA(n_components=2)
                 p = pca.fit_transform(p)
                 p_ = p.copy()
                 plotIntermediate(p_.ravel(), it=i, label=class_label, save=True, name="rotated")
                 range_limits = avg_pos(p, range_limits, class_label)
-            # elif class_ordering == "p_sim": # already reordered when init
-            #     pass
             
             # align at 0
             p[:, 0] -= (np.max(p[:, 0]) + np.min(p[:, 0])) / 2
@@ -876,8 +918,7 @@ def trustworthiness(X, X_embedded, *, n_neighbors=5, metric="euclidean"):
     return t
 
 def plotIntermediate(p, it, label=None, show=False, save=False, name="default"):
-    n_points = len(p) // 2
-    p_reshaped = p.reshape(n_points, 2)  # Reshape to (n_points, 2)
+    p_reshaped = p.reshape(-1, 2)  # Reshape to (n_points, 2)
     
     plt.figure(figsize=(8, 6))
     if label is not None:
@@ -895,10 +936,6 @@ def plotIntermediate(p, it, label=None, show=False, save=False, name="default"):
     if show:
         plt.show()
     plt.close()
-
-def adjust_range_class_density_based(range_limits, class_label):
-    new_range_limits = np.zeros((class_label.shape[0], 2))
-    import numpy as np
 
 def adjust_range_class_density_based(range_limits, class_label):
     # TODO: not accounting for class input order (used default order)

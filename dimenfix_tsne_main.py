@@ -73,7 +73,7 @@ def main():
     start = timer()
     y = TSNEDimenfix(n_components=2, learning_rate='auto', init='random', perplexity=10, \
                      method="exact", \
-                      dimenfix=True, range_limits=range_limits, density_adj=True, class_ordering="p_sim", class_label=label, fix_iter=50, mode="rescale", early_push=False).fit_transform(X)
+                      dimenfix=True, range_limits=range_limits, density_adj=True, class_ordering="disable", class_label=label, fix_iter=50, mode="rescale", early_push=False).fit_transform(X)
     end = timer()
     # print(f"{trustworthiness(X, y, n_neighbors=20):.3f}")
 
