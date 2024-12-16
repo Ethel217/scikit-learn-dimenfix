@@ -603,6 +603,7 @@ def _gradient_descent(
     dimenfix,
     range_limits,
     class_ordering,
+    rotation,
     class_label,
     fix_iter, # apply fix (and order classes) every N iters
     mode="clip",
@@ -679,7 +680,7 @@ def _gradient_descent(
             p[:, 0] *= scaling_factor
                 
             # reorder by editing range_limits
-            if class_ordering == "disable":
+            if class_ordering == "disable" and rotation:
                 # if first_push:
                 #     first_push = False
                 #     p = rotate_for_min_push(p, range_limits)
@@ -1018,6 +1019,7 @@ class TSNEDimenfix(ClassNamePrefixFeaturesOutMixin, TransformerMixin, BaseEstima
         range_limits=None,
         density_adj=False,
         class_ordering="disable",
+        rotation=False,
         class_label=None,
         fix_iter=30,
         mode="clip",
@@ -1044,6 +1046,7 @@ class TSNEDimenfix(ClassNamePrefixFeaturesOutMixin, TransformerMixin, BaseEstima
         self.range_limits = range_limits
         self.density_adj = density_adj
         self.class_ordering = class_ordering
+        self.rotation = rotation
         self.class_label = class_label
         self.fix_iter = fix_iter
         self.mode = mode
@@ -1327,6 +1330,7 @@ class TSNEDimenfix(ClassNamePrefixFeaturesOutMixin, TransformerMixin, BaseEstima
             "dimenfix": self.dimenfix,
             "range_limits": self.range_limits,
             "class_ordering": self.class_ordering,
+            "rotation": self.rotation,
             "class_label": self.class_label,
             "fix_iter": self.fix_iter,
             "mode": self.mode,
