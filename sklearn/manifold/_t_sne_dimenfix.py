@@ -602,6 +602,7 @@ def _gradient_descent(
     # dimenfix related params
     dimenfix,
     range_limits,
+    alpha,
     class_ordering,
     rotation,
     class_label,
@@ -711,10 +712,13 @@ def _gradient_descent(
             p[:, 0] -= (np.max(p[:, 0]) + np.min(p[:, 0])) / 2
 
             # push into bins
+            # TODO: add alpha here
             lower_bound = np.min(p[:, 0])
 
             if mode == "clip":
-                p[:, 0] = np.clip(p[:, 0], lower_bound + (range_limits[:, 0] / 100) * x_range, lower_bound + (range_limits[:, 1] / 100) * x_range)
+                mid = (range_limits[:, 0] + range_limits[:, 1]) * x_range / 200
+                half = (range_limits[:, 1] - range_limits[:, 0]) * x_range * alpha / 200
+                p[:, 0] = np.clip(p[:, 0], lower_bound + mid - half, lower_bound + mid + half)
             
             elif mode == "gaussian": # default CI = 0.9
                 CI = 0.9
@@ -722,7 +726,7 @@ def _gradient_descent(
                 if np.abs(range_limits[:, 1] - range_limits[:, 0]).all() <= 1e-6:
                     sigma = np.full_like(range_limits[:, 0], x_range / (10 * z)) # for fixed value
                 else:
-                    sigma = (range_limits[:, 1] - range_limits[:, 0]) * x_range / (40 * z)
+                    sigma = (range_limits[:, 1] - range_limits[:, 0]) * x_range * alpha / (200 * z)
                 # print(sigma[0])
 
                 ori_pos = lower_bound + (range_limits[:, 0] + range_limits[:, 1]) * x_range / 200
@@ -755,7 +759,7 @@ def _gradient_descent(
                     label_indices = np.where(class_label == label)[0]
                     lower = range_limits[label_indices[0], 0] * x_range / 100
                     upper = range_limits[label_indices[0], 1] * x_range / 100
-                    set_range = upper - lower
+                    set_range = (upper - lower) * alpha
 
                     p[class_label == label, 0] *= set_range / y_range
                     center_pos = (upper_c + lower_c) * (set_range / y_range)  / 2
@@ -815,7 +819,7 @@ def _gradient_descent(
     prefer_skip_nested_validation=True,
 )
 def trustworthiness(X, X_embedded, *, n_neighbors=5, metric="euclidean"):
-    # TODO: unused
+    # unused
     r"""Indicate to what extent the local structure is retained.
 
     The trustworthiness is within [0, 1]. It is defined as
@@ -1017,6 +1021,7 @@ class TSNEDimenfix(ClassNamePrefixFeaturesOutMixin, TransformerMixin, BaseEstima
         # dimenfix related params
         dimenfix=False,
         range_limits=None,
+        alpha=1.0,
         density_adj=False,
         class_ordering="disable",
         rotation=False,
@@ -1044,6 +1049,7 @@ class TSNEDimenfix(ClassNamePrefixFeaturesOutMixin, TransformerMixin, BaseEstima
         # dimenfix related params
         self.dimenfix = dimenfix
         self.range_limits = range_limits
+        self.alpha = alpha
         self.density_adj = density_adj
         self.class_ordering = class_ordering
         self.rotation = rotation
@@ -1329,6 +1335,7 @@ class TSNEDimenfix(ClassNamePrefixFeaturesOutMixin, TransformerMixin, BaseEstima
             "momentum": 0.5,
             "dimenfix": self.dimenfix,
             "range_limits": self.range_limits,
+            "alpha": self.alpha,
             "class_ordering": self.class_ordering,
             "rotation": self.rotation,
             "class_label": self.class_label,

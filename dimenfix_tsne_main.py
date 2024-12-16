@@ -35,7 +35,7 @@ def main():
     # use MNIST dataset
     mnist = fetch_openml('mnist_784', version=1, data_home=".\\scikit_learn_data")
     X = mnist.data.to_numpy()
-    sample_indices = np.random.choice(X.shape[0], size=5000, replace=False)
+    sample_indices = np.random.choice(X.shape[0], size=1000, replace=False)
     X = X[sample_indices]
     X = preprocessing.MinMaxScaler().fit_transform(X)
     label = mnist.target.to_numpy()
@@ -73,7 +73,7 @@ def main():
     start = timer()
     y = TSNEDimenfix(n_components=2, learning_rate='auto', init='random', perplexity=10, \
                      method="exact", \
-                      dimenfix=True, range_limits=range_limits, density_adj=True, class_ordering="disable", rotation=True, class_label=label, fix_iter=50, mode="rescale", early_push=False).fit_transform(X)
+                      dimenfix=True, range_limits=range_limits, alpha=1.0, density_adj=True, class_ordering="disable", rotation=True, class_label=label, fix_iter=50, mode="rescale", early_push=False).fit_transform(X)
     end = timer()
     # print(f"{trustworthiness(X, y, n_neighbors=20):.3f}")
 
