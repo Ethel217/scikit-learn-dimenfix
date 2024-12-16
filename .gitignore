@@ -105,3 +105,4 @@ figures/
 
 # downloaded data
 scikit_learn_data/
+visualization/*.json
